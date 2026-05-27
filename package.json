@@ -1,6 +1,7 @@
 {
-  "name": "ts-base",
+  "name": "ripmanaba",
   "private": true,
+  "description": "CLI for accessing the manaba learning management service.",
   "type": "module",
   "module": "src/index.ts",
   "scripts": {
