@@ -15,10 +15,12 @@ const cli = cac("ripmanaba");
 const appDirectory = join(homedir(), ".ripmanaba");
 const browserProfileDirectory = join(appDirectory, "browser-profile");
 const sessionFile = join(appDirectory, "session.json");
+const storageStateFile = join(appDirectory, "storage-state.json");
 
 interface SessionConfig {
   origin: string;
   browserProfileDirectory: string;
+  storageStateFile: string;
   authenticatedAt: string;
 }
 
@@ -59,6 +61,13 @@ async function readSessionConfig(): Promise<SessionConfig | undefined> {
 async function writeSessionConfig(config: SessionConfig): Promise<void> {
   await ensureParentDirectory(sessionFile);
   await writeFile(sessionFile, `${JSON.stringify(config, undefined, 2)}\n`);
+}
+
+async function writeBrowserStorageState(
+  context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>,
+): Promise<void> {
+  await ensureParentDirectory(storageStateFile);
+  await context.storageState({ path: storageStateFile });
 }
 
 function resolveAuthUrl(options: CommandOptions): string {
@@ -102,10 +111,13 @@ async function authenticate(options: CommandOptions): Promise<void> {
 
     const origin = normalizeOrigin(originUrl);
 
+    await writeBrowserStorageState(context);
+
     await writeSessionConfig({
       authenticatedAt: new Date().toISOString(),
       browserProfileDirectory,
       origin,
+      storageStateFile,
     });
 
     console.log(`Saved manaba session for ${origin}`);
