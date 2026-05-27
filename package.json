@@ -4,7 +4,11 @@
   "description": "CLI for accessing the manaba learning management service.",
   "type": "module",
   "module": "src/index.ts",
+  "bin": {
+    "ripmanaba": "src/index.ts"
+  },
   "scripts": {
+    "dev": "bun src/index.ts",
     "format": "pnpm run lint --fix . ; oxfmt . ; eslint --fix .",
     "preinstall": "npx only-allow pnpm",
     "postinstall": "git config core.hooksPath .githooks",
@@ -25,8 +29,13 @@
       "sort-package-json"
     ]
   },
+  "dependencies": {
+    "cac": "^6.7.14",
+    "playwright": "^1.57.0"
+  },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",
+    "@types/node": "^25.0.0",
     "@typescript/native-preview": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-oxlint": "catalog:",

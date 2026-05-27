@@ -15,8 +15,11 @@ bun i -g ripmanaba
 ブラウザが立ち上がってユーザーが手動でログイン
 
 ```sh
-ripmanaba auth
+ripmanaba auth --url https://example.manaba.jp/ct/home
+RIPMANABA_URL=https://example.manaba.jp/ct/home ripmanaba auth
 ```
+
+認証済みブラウザ状態は `~/.ripmanaba/browser-profile` に保存される。
 
 コース(履修科目)関連
 
