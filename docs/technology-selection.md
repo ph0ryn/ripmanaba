@@ -1,79 +1,100 @@
-# Technology Selection
+# 技術選定
 
-## Status
+## ステータス
 
-Initial selection for ripmanaba.
+ripmanaba の初期技術選定。
 
-This document records decisions that are already fixed and items that must be
-decided after scraping investigation.
+この文書には、すでに決めた方針と、スクレイピング調査後も未決定の項目を記
+録する。
 
-## Decisions
+現時点では、manabaの主要画面がserver-rendered HTMLとして取得できる前提で
+実装に進む。DOM構造、path、返却JSON型は `docs/` に整理済みであり、追加の
+PoC実装は行わない。実装中に不確実な画面やclient-side rendering依存が見つ
+かった場合のみ、目的を絞ったPoCを作る。
 
-### Runtime
+## 決定事項
 
-- Target runtime: Bun only.
-- The CLI does not target Node.js compatibility as a primary goal.
-- TypeScript remains the implementation language.
-- The existing pnpm-based development setup is kept for now.
+### ランタイム
 
-### CLI Framework
+- 対象ランタイムは Bun のみ。
+- CLI は Node.js 互換性を主目的にしない。
+- 実装言語は TypeScript のままにする。
+- 既存の pnpm ベースの開発環境は当面維持する。
 
-- Use `cac`.
-- Reason:
-  - Small API surface.
-  - Supports subcommands, aliases, options, help, and version output.
-  - Fits commands such as `ripmanaba course|crs ls`.
+### CLI フレームワーク
 
-### Browser Automation
+- `cac` を使う。
+- 理由:
+  - API の表面積が小さい。
+  - サブコマンド、alias、option、help、version 出力に対応している。
+  - `ripmanaba course|crs ls` のようなコマンドに合う。
 
-- Use Playwright Chromium for login and initial scraping PoC.
-- Use Playwright's persistent browser context for session persistence.
-- Store browser state in a dedicated ripmanaba profile directory.
-- Do not automate the user's default Chrome profile.
+### CLI 形状
 
-Expected profile location:
+- top-level resource と共通 operation の組み合わせにする。
+- 標準 operation は `ls`, `info <id>`, `open <id>`。
+- `ripmanaba course content open <id>` のような深いコマンド列は避ける。
+- 代わりに `ripmanaba content open <content-id>` を使う。
+- 単数形と複数形のコマンド名で operation を区別しない。
+
+See [CLIコマンド設計](./cli-command-design.md).
+
+### ブラウザ自動化
+
+- Playwright Chromium はログインと追加調査が必要な場合だけ使う。
+- セッション永続化には Playwright の persistent browser context を使う。
+- ブラウザ状態は ripmanaba 専用 profile directory に保存する。
+- ユーザーの default Chrome profile は自動操作しない。
+- 認証後の通常コマンドではブラウザ自動化を使わない。
+
+想定 profile location:
 
 ```text
 ~/.ripmanaba/browser-profile
 ```
 
-### Authentication Flow
+### スクレイピング方針
 
-- `ripmanaba auth` opens Playwright Chromium.
-- The user logs in to manaba manually.
-- The authenticated browser state is kept in the dedicated profile directory.
-- Later commands reuse that profile when accessing manaba.
+- `ripmanaba auth` はブラウザ自動化を使ってよい。ログインには SSO、MFA、
+  手動操作が絡む可能性があるため。
+- それ以外のコマンドは manaba のページを直接 fetch し、返ってきた HTML を
+  parse する。
+- 対象ページが client-side rendering を必要とすると後から判明しない限り、
+  通常の認証済みスクレイピングでは Playwright、Chromium、その他のブラウザ
+  自動化を使わない。
+- スクレイピングしたリンクは、`ManabaPath` を抽出する前に取得元ページの
+  URL を基準に正規化する。
+- ブラウザ自動化は調査用ツールとして残すが、runtime の標準スクレイピング
+  手段にはしない。
 
-## Deferred Decisions
+### 認証フロー
 
-### Scraping Strategy
+- `ripmanaba auth` は Playwright Chromium を開く。
+- ユーザーは manaba に手動ログインする。
+- 認証済みブラウザ状態は専用 profile directory に保持する。
+- 以後のコマンドは、認証済みセッション情報を直接 HTTP request に再利用す
+  る。
 
-The final scraping strategy is intentionally undecided until manaba page
-structure has been investigated.
-
-Candidates:
-
-- Playwright-only browser automation.
-- Login with Playwright, then fetch pages and parse HTML.
-- Hybrid approach:
-  - Use Playwright for login and dynamic pages.
-  - Use direct HTTP fetching and HTML parsing for stable pages.
-
-The likely default is the hybrid approach, but it must be confirmed by PoC.
+## 未決定事項
 
 ### HTML Parser
 
-Do not select an HTML parser yet.
+具体的な HTML parser はまだ選ばない。必要なのは
+`docs/scraping-methods.md` に書いた selector で server-rendered HTML を辿
+れることだけ。
 
-Select one only after confirming whether direct HTML parsing is useful for the
-target manaba pages.
+## 調査結果
 
-## Investigation Plan
+1. スクレイピング調査用の専用 branch で manaba のページ構造を調べた。
+2. ページ構造、path、selector、ID抽出方法を `docs/` に記録した。
+3. 対象 workflow の返却JSON型を `docs/return-types.md` に定義した。
+4. 通常コマンドはfetch + HTML parseで進める方針に決定した。
+5. PoC実装は作らず、実装中に未確認箇所が見つかった場合だけ追加調査する。
 
-1. Use a dedicated PoC branch for scraping investigation.
-2. Inspect manaba page structure with browser automation tools.
-3. Record page structure findings under `docs/`.
-4. Create focused PoCs under `poc/` for each target workflow.
-5. Decide whether each workflow should use Playwright, HTTP scraping, or a
-   hybrid method.
-6. Update this document when the scraping strategy is finalized.
+調査済み workflow:
+
+- `course`
+- `task`
+- `content`
+- `notice`
+- `submission`
