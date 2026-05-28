@@ -14,6 +14,55 @@ export interface CourseSummary {
   url: ManabaUrl;
 }
 
+export interface CourseListItemJson extends CourseSummary {
+  year?: string;
+  term?: string;
+  schedule?: string;
+  instructors: string[];
+  favorite?: boolean;
+}
+
+export interface CourseNewsSummary {
+  id?: string;
+  title: string;
+  publishedAt?: DateTimeString;
+  url?: ManabaUrl;
+}
+
+export interface TopicSummary {
+  id: string;
+  title: string;
+  url: ManabaUrl;
+  updatedAt?: DateTimeString;
+}
+
+export interface ContentSummary {
+  id: string;
+  title: string;
+  url: ManabaUrl;
+  updatedAt?: DateTimeString;
+  pageCount?: number;
+}
+
+export interface CourseInfoJson {
+  resource: "course";
+  id: string;
+  url: ManabaUrl;
+  courseCode?: string;
+  name: string;
+  instructors: string[];
+  year?: string;
+  term?: string;
+  schedule?: string;
+  syllabusUrl?: string;
+  news: {
+    items: CourseNewsSummary[];
+    empty: boolean;
+  };
+  recentTopics: TopicSummary[];
+  recentContents: ContentSummary[];
+}
+
 export type TaskKind = "report" | "quiz" | "survey";
 
 export type TaskStatus = "notStarted" | "open" | "closed" | "submitted" | "unknown";

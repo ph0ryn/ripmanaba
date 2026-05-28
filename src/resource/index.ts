@@ -1,4 +1,4 @@
-import { openManabaPath } from "../open.ts";
+import { getCourseInfo, listCourses, openCourse } from "./course.ts";
 import { getTaskInfo, listTasks, openTask } from "./task.ts";
 
 import type { CAC } from "cac";
@@ -55,28 +55,24 @@ async function runTaskCommand(operation: string, id: string | undefined): Promis
   await openTask(resourceId);
 }
 
-async function runPlaceholderResourceCommand(
-  config: ResourceCommandConfig,
-  operation: string,
-  id: string | undefined,
-): Promise<void> {
+async function runCourseCommand(operation: string, id: string | undefined): Promise<void> {
   assertResourceOperation(operation);
+
+  if (operation === "ls") {
+    printJson(await listCourses());
+
+    return;
+  }
 
   const resourceId = requireResourceId(operation, id);
 
-  if (operation === "ls") {
-    throw new Error(`${config.name} ls is not implemented yet.`);
-  }
-
   if (operation === "info") {
-    throw new Error(`${config.name} info is not implemented yet.`);
+    printJson(await getCourseInfo(resourceId));
+
+    return;
   }
 
-  if (config.infoPath === undefined) {
-    throw new Error(`${config.name} open is not implemented yet.`);
-  }
-
-  await openManabaPath(config.infoPath(resourceId));
+  await openCourse(resourceId);
 }
 
 function registerResourceCommands(
@@ -96,13 +92,10 @@ function registerResourceCommands(
 export function registerResourceCli(cli: CAC): void {
   const courseConfig: ResourceCommandConfig = {
     aliases: ["crs"],
-    infoPath: (id) => `course_${id}`,
     name: "course",
   };
 
-  registerResourceCommands(cli, courseConfig, async (operation, id) => {
-    await runPlaceholderResourceCommand(courseConfig, operation, id);
-  });
+  registerResourceCommands(cli, courseConfig, runCourseCommand);
 
   registerResourceCommands(cli, { name: "task" }, runTaskCommand);
 }
