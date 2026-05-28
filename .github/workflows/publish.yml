@@ -1,0 +1,30 @@
+name: Publish Package
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
+          registry-url: "https://registry.npmjs.org"
+          node-version: lts/*
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6.0.8
+
+      - run: pnpm i --frozen-lockfile
+      - run: pnpm publish --provenance --no-git-checks --access public
