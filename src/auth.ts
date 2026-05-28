@@ -42,6 +42,18 @@ async function waitForUserLogin(): Promise<void> {
   }
 }
 
+async function confirmSessionOrigin(origin: string): Promise<boolean> {
+  const readline = createInterface({ input, output });
+
+  try {
+    const answer = await readline.question(`Save manaba session for ${origin}? [y/N] `);
+
+    return answer.trim().toLowerCase() === "y";
+  } finally {
+    readline.close();
+  }
+}
+
 export async function authenticate(): Promise<void> {
   const context = await chromium.launchPersistentContext(browserProfileDirectory, {
     headless: false,
@@ -62,6 +74,12 @@ export async function authenticate(): Promise<void> {
     }
 
     const origin = normalizeOrigin(currentUrl);
+
+    if (!(await confirmSessionOrigin(origin))) {
+      console.log("Canceled. Session was not saved.");
+
+      return;
+    }
 
     await writeBrowserStorageState(context);
 
