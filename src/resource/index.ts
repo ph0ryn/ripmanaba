@@ -1,4 +1,7 @@
+import { getContentInfo, listContents, openContent } from "./content.ts";
 import { getCourseInfo, listCourses, openCourse } from "./course.ts";
+import { getNoticeInfo, listNotices, openNotice } from "./notice.ts";
+import { getSubmissionInfo, listSubmissions, openSubmission } from "./submission.ts";
 import { getTaskInfo, listTasks, openTask } from "./task.ts";
 
 import type { CAC } from "cac";
@@ -75,6 +78,70 @@ async function runCourseCommand(operation: string, id: string | undefined): Prom
   await openCourse(resourceId);
 }
 
+async function runContentCommand(operation: string, id: string | undefined): Promise<void> {
+  assertResourceOperation(operation);
+
+  if (operation === "ls") {
+    if (id === undefined) {
+      throw new Error("content ls requires a course id.");
+    }
+
+    printJson(await listContents(id));
+
+    return;
+  }
+
+  const resourceId = requireResourceId(operation, id);
+
+  if (operation === "info") {
+    printJson(await getContentInfo(resourceId));
+
+    return;
+  }
+
+  await openContent(resourceId);
+}
+
+async function runNoticeCommand(operation: string, id: string | undefined): Promise<void> {
+  assertResourceOperation(operation);
+
+  if (operation === "ls") {
+    printJson(await listNotices());
+
+    return;
+  }
+
+  const resourceId = requireResourceId(operation, id);
+
+  if (operation === "info") {
+    printJson(await getNoticeInfo(resourceId));
+
+    return;
+  }
+
+  await openNotice(resourceId);
+}
+
+async function runSubmissionCommand(operation: string, id: string | undefined): Promise<void> {
+  assertResourceOperation(operation);
+
+  if (operation === "ls") {
+    printJson(await listSubmissions());
+
+    return;
+  }
+
+  const resourceId = requireResourceId(operation, id);
+
+  if (operation === "info") {
+    printJson(await getSubmissionInfo(resourceId));
+
+    return;
+  }
+
+  await openSubmission(resourceId);
+}
+
 function registerResourceCommands(
   cli: CAC,
   config: ResourceCommandConfig,
@@ -98,4 +165,10 @@ export function registerResourceCli(cli: CAC): void {
   registerResourceCommands(cli, courseConfig, runCourseCommand);
 
   registerResourceCommands(cli, { name: "task" }, runTaskCommand);
+
+  registerResourceCommands(cli, { name: "content" }, runContentCommand);
+
+  registerResourceCommands(cli, { name: "notice" }, runNoticeCommand);
+
+  registerResourceCommands(cli, { name: "submission" }, runSubmissionCommand);
 }

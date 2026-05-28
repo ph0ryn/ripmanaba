@@ -44,6 +44,10 @@ export interface ContentSummary {
   pageCount?: number;
 }
 
+export interface ContentListItemJson extends ContentSummary {
+  course: CourseSummary;
+}
+
 export interface CourseInfoJson {
   resource: "course";
   id: string;
@@ -121,3 +125,68 @@ export interface SurveyTaskInfoJson extends TaskBaseInfoJson {
 }
 
 export type TaskInfoJson = ReportTaskInfoJson | QuizTaskInfoJson | SurveyTaskInfoJson;
+
+export interface ContentPageInfo {
+  id?: string;
+  title: string;
+  url: ManabaUrl;
+  publishedFrom?: DateTimeString;
+  publishedUntil?: DateTimeString;
+  attachments: AttachmentInfo[];
+  updatedAt?: DateTimeString;
+  updatedBy?: string;
+  versionLabel?: string;
+}
+
+export interface ContentPageSummary {
+  id?: string;
+  title: string;
+  url: ManabaUrl;
+}
+
+export interface ContentInfoJson {
+  resource: "content";
+  id: string;
+  url: ManabaUrl;
+  title: string;
+  course: CourseSummary;
+  publishedFrom?: DateTimeString;
+  publishedUntil?: DateTimeString;
+  updatedAt?: DateTimeString;
+  currentPage?: ContentPageInfo;
+  pages: ContentPageSummary[];
+}
+
+export interface NoticeListItemJson {
+  id: string;
+  title: string;
+  url: ManabaUrl;
+  publishedAt?: DateTimeString;
+}
+
+export interface NoticeInfoJson {
+  resource: "notice";
+  id: string;
+  url: ManabaUrl;
+  title: string;
+  publishedAt?: DateTimeString;
+  bodyText: string;
+  updatedAt?: DateTimeString;
+}
+
+export type SubmissionKind = "quiz" | "survey" | "drill" | "report" | "project" | "unknown";
+
+export interface SubmissionListItemJson {
+  id: string;
+  kind: SubmissionKind;
+  title: string;
+  url: ManabaUrl;
+  course: CourseSummary;
+  submittedAt: DateTimeString;
+  statusLabel?: string;
+}
+
+export interface SubmissionInfoJson extends SubmissionListItemJson {
+  resource: "submission";
+  detailText?: string;
+}

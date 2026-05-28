@@ -41,6 +41,33 @@ ripmanaba task [op]
   open [task ID]
 ```
 
+コースコンテンツ関連
+
+```sh
+ripmanaba content [op]
+  ls [course ID]
+  info [content ID]
+  open [content ID]
+```
+
+全体お知らせ関連
+
+```sh
+ripmanaba notice [op]
+  ls
+  info [notice ID]
+  open [notice ID]
+```
+
+提出記録関連
+
+```sh
+ripmanaba submission [op]
+  ls
+  info [submission ID]
+  open [submission ID]
+```
+
 ## Requirements
 
 - Bun: for runtime

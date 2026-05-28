@@ -40,15 +40,13 @@ ripmanaba crs info <course-id>
 ripmanaba crs open <course-id>
 ```
 
-## 追加候補
-
-初期実装後に追加する候補。
+## 追加コマンド
 
 ```sh
 ripmanaba <resource> <operation> [id]
 ```
 
-追加候補resource:
+追加resource:
 
 - `content`
 - `notice`
@@ -63,9 +61,9 @@ ripmanaba <resource> <operation> [id]
 | ---------------- | --------------- | -------- | ----------------------------------------- |
 | コース           | `course`        | 初期実装 | `crs` aliasを用意する                     |
 | 未提出課題       | `task`          | 初期実装 | 複数コース横断の課題配列として扱う        |
-| コースコンテンツ | `content`       | 追加候補 | `course content` にはしない               |
-| 全体お知らせ     | `notice`        | 追加候補 | コースニュースとは別resource              |
-| 提出記録         | `submission`    | 追加候補 | 複数コース横断の提出配列として扱う        |
+| コースコンテンツ | `content`       | 実装済み | `course content` にはしない               |
+| 全体お知らせ     | `notice`        | 実装済み | コースニュースとは別resource              |
+| 提出記録         | `submission`    | 実装済み | 複数コース横断の提出配列として扱う        |
 | コースニュース   | 未定            | 追加候補 | `notice` に含めるか別resourceにするか未定 |
 | 小テスト         | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
 | アンケート       | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
@@ -82,7 +80,7 @@ ripmanaba <resource> <operation> [id]
 
 ## コマンドツリー
 
-初期実装と追加候補まで含めたCLI構造。
+初期実装と追加resourceまで含めたCLI構造。
 
 ```text
 ripmanaba
@@ -98,7 +96,7 @@ ripmanaba
 - `course`
 - `task`
 
-追加候補resource:
+追加resource:
 
 - `content`
 - `notice`
@@ -119,8 +117,8 @@ operation:
 `open` は `info` の `url` を保存して使うのではなく、同じURL算出ロジックで
 対象画面を開く。
 
-`content`、`notice`、`submission` は追加候補であり、初期実装では必須にしな
-い。
+`content ls` はコース内のコンテンツ一覧を対象にするため、`id` に
+`course-id` を渡す。
 
 ## Resourceごとの情報源
 

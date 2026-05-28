@@ -211,9 +211,7 @@ manaba
 - お知らせタイトル
 - 詳細へのリンク
 
-現時点ではCLIの主要対象ではないが、ホーム画面の情報として存在する。
-
-追加コマンド候補:
+ホーム画面の全体お知らせとしてCLI対象にする。
 
 - `ripmanaba notice ls`
 - `ripmanaba notice info <notice-id>`
@@ -271,10 +269,7 @@ manaba
 `ripmanaba course info [course ID]`では、この画面のコース概要とメニュー
 状態が候補になる。
 
-コースコンテンツは、深いコマンド階層にはせず `content` resourceとして扱う
-候補にする。
-
-追加コマンド候補:
+コースコンテンツは、深いコマンド階層にはせず `content` resourceとして扱う。
 
 - `ripmanaba content ls [course-id]`
 - `ripmanaba content info <content-id>`
@@ -349,10 +344,7 @@ manaba
 - 90日
 - 180日
 
-READMEの最低要件には入っていないが、提出済み課題や履歴系コマンドの候補に
-なる。
-
-追加コマンド候補:
+提出済み課題や履歴系の `submission` resourceとして扱う。
 
 - `ripmanaba submission ls`
 - `ripmanaba submission info <submission-id>`
