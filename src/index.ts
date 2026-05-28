@@ -24,12 +24,6 @@ interface SessionConfig {
   authenticatedAt: string;
 }
 
-interface CommandOptions {
-  url?: string;
-}
-
-const defaultAuthUrl = process.env["RIPMANABA_URL"];
-
 function normalizeOrigin(url: string): string {
   return new URL(url).origin;
 }
@@ -70,46 +64,51 @@ async function writeBrowserStorageState(
   await context.storageState({ path: storageStateFile });
 }
 
-function resolveAuthUrl(options: CommandOptions): string {
-  const rawUrl = options.url ?? defaultAuthUrl;
+function findOpenPageUrl(
+  context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>,
+): string | undefined {
+  const pages = [...context.pages()].reverse();
 
-  if (rawUrl === undefined) {
-    throw new Error("Missing manaba URL. Pass --url <url> or set RIPMANABA_URL.");
+  for (const page of pages) {
+    const url = page.url();
+
+    if (url !== "about:blank") {
+      return url;
+    }
   }
 
-  return new URL(rawUrl).toString();
+  return undefined;
 }
 
 async function waitForUserLogin(): Promise<void> {
   const readline = createInterface({ input, output });
 
   try {
-    await readline.question("Log in to manaba, then press Enter here.");
+    await readline.question("Open manaba in the browser, log in, then press Enter here.");
   } finally {
     readline.close();
   }
 }
 
-async function authenticate(options: CommandOptions): Promise<void> {
-  const authUrl = resolveAuthUrl(options);
+async function authenticate(): Promise<void> {
   const context = await chromium.launchPersistentContext(browserProfileDirectory, {
     headless: false,
   });
 
   try {
-    const page = context.pages()[0] ?? (await context.newPage());
-
-    await page.goto(authUrl);
-    await waitForUserLogin();
-
-    const currentUrl = page.url();
-    let originUrl = currentUrl;
-
-    if (currentUrl === "about:blank") {
-      originUrl = authUrl;
+    if (context.pages().length === 0) {
+      await context.newPage();
     }
 
-    const origin = normalizeOrigin(originUrl);
+    await waitForUserLogin();
+
+    const currentUrl = findOpenPageUrl(context);
+
+    if (currentUrl === undefined) {
+      throw new Error("No manaba page is open. Open manaba and log in before pressing Enter.");
+    }
+
+    const origin = normalizeOrigin(currentUrl);
 
     await writeBrowserStorageState(context);
 
@@ -232,7 +231,6 @@ function registerResourceCommands(config: ResourceCommandConfig): void {
 
 cli
   .command("auth", "Open a persistent browser profile and save manaba session metadata")
-  .option("--url <url>", "manaba URL to open")
   .action(authenticate);
 
 registerResourceCommands({
