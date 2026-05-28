@@ -147,12 +147,14 @@ function registerResourceCommands(
   config: ResourceCommandConfig,
   action: (operation: string, id: string | undefined) => Promise<void>,
 ): void {
-  for (const commandName of [config.name, ...(config.aliases ?? [])]) {
-    cli
-      .command(`${commandName} <operation> [id]`, `Run ${config.name} operation`)
-      .action(async (operation: string, id: string | undefined) => {
-        await action(operation, id);
-      });
+  const command = cli
+    .command(`${config.name} <operation> [id]`, `Run ${config.name} operation`)
+    .action(async (operation: string, id: string | undefined) => {
+      await action(operation, id);
+    });
+
+  for (const alias of config.aliases ?? []) {
+    command.alias(alias);
   }
 }
 
