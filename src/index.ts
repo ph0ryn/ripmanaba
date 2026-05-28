@@ -2,6 +2,7 @@
 
 import { cac } from "cac";
 
+import packageJson from "../package.json" with { type: "json" };
 import { authenticate } from "./auth.ts";
 import { registerResourceCli } from "./resource/index.ts";
 
@@ -14,7 +15,7 @@ cli
 registerResourceCli(cli);
 
 cli.help();
-cli.version("0.0.0");
+cli.version(packageJson.version);
 
 async function main(): Promise<void> {
   cli.parse(process.argv, { run: false });

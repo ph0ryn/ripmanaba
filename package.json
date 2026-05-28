@@ -1,17 +1,26 @@
 {
   "name": "ripmanaba",
-  "private": true,
+  "version": "0.1.0",
   "description": "CLI for accessing the manaba learning management service.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ph0ryn/ripmanaba.git"
+  },
+  "license": "MIT",
+  "author": "ph0ryn",
   "type": "module",
   "module": "src/index.ts",
   "bin": {
-    "ripmanaba": "src/index.ts"
+    "ripmanaba": "./src/index.ts"
   },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "dev": "bun src/index.ts",
     "format": "pnpm run lint --fix . ; oxfmt . ; eslint --fix .",
-    "preinstall": "npx only-allow pnpm",
-    "postinstall": "git config core.hooksPath .githooks",
     "lint": "oxlint --type-aware --type-check",
     "precommit": "pnpm run format"
   },
@@ -48,5 +57,11 @@
     "typescript": "catalog:",
     "typescript-eslint": "catalog:"
   },
-  "packageManager": "pnpm@11.1.1"
+  "packageManager": "pnpm@11.1.1",
+  "engines": {
+    "bun": ">=1.2.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
 }
