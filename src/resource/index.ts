@@ -104,5 +104,5 @@ export function registerResourceCli(cli: CAC): void {
     await runPlaceholderResourceCommand(courseConfig, operation, id);
   });
 
-  registerResourceCommands(cli, { aliases: ["tsk"], name: "task" }, runTaskCommand);
+  registerResourceCommands(cli, { name: "task" }, runTaskCommand);
 }
