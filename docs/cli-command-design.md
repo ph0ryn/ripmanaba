@@ -40,6 +40,14 @@ ripmanaba crs info <course-id>
 ripmanaba crs open <course-id>
 ```
 
+`task` には `tsk` aliasを用意する。
+
+```sh
+ripmanaba tsk ls
+ripmanaba tsk info <task-id>
+ripmanaba tsk open <task-id>
+```
+
 ## 追加候補
 
 初期実装後に追加する候補。
@@ -62,7 +70,7 @@ ripmanaba <resource> <operation> [id]
 | resource | CLI名 | 状態 | 備考 |
 | --- | --- | --- | --- |
 | コース | `course` | 初期実装 | `crs` aliasを用意する |
-| 未提出課題 | `task` | 初期実装 | 複数コース横断の課題配列として扱う |
+| 未提出課題 | `task` | 初期実装 | `tsk` aliasを用意する。複数コース横断の課題配列として扱う |
 | コースコンテンツ | `content` | 追加候補 | `course content` にはしない |
 | 全体お知らせ | `notice` | 追加候補 | コースニュースとは別resource |
 | 提出記録 | `submission` | 追加候補 | 複数コース横断の提出配列として扱う |
@@ -107,6 +115,7 @@ ripmanaba
 alias:
 
 - `crs`: `course`
+- `tsk`: `task`
 
 operation:
 

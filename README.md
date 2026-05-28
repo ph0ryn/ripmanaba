@@ -35,7 +35,7 @@ ripmanaba course|crs [op]
 未提出課題関連
 
 ```sh
-ripmanaba task [op]
+ripmanaba task|tsk [op]
   ls
   info [task ID]
   open [task ID]
