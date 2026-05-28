@@ -2,6 +2,14 @@ import * as cheerio from "cheerio";
 
 import { fetchManabaText, getManabaOrigin } from "../http.ts";
 import { manabaPathToUrl, openUrl } from "../open.ts";
+import {
+  extractIdFromUrl,
+  optionalText,
+  parseDateTime,
+  resolveUrl,
+  type ElementSelection,
+  textOf,
+} from "./helpers.ts";
 
 import type { NoticeInfoJson, NoticeListItemJson } from "./types.ts";
 import type { CheerioAPI } from "cheerio";
@@ -9,42 +17,8 @@ import type { CheerioAPI } from "cheerio";
 const homePath = "/ct/home";
 const noticePathPattern = /\/ct\/home_campusnews_([^/?#]+)/;
 
-type ElementSelection = ReturnType<CheerioAPI>;
-
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function optionalText(text: string): string | undefined {
-  const normalized = normalizeText(text);
-
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized;
-}
-
-function textOf(element: ElementSelection): string {
-  return normalizeText(element.text());
-}
-
-function resolveUrl(rawHref: string, baseUrl: string): string {
-  return new URL(rawHref, baseUrl).toString();
-}
-
-function pathFromUrl(url: string): string {
-  const parsed = new URL(url);
-
-  return `${parsed.pathname}${parsed.search}`;
-}
-
 function extractNoticeId(url: string): string | undefined {
-  return noticePathPattern.exec(pathFromUrl(url))?.[1];
-}
-
-function parseDateTime(text: string): string | undefined {
-  return /\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?/.exec(text)?.[0];
+  return extractIdFromUrl(url, noticePathPattern);
 }
 
 function findNoticeTable($: CheerioAPI): ElementSelection {

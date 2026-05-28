@@ -2,54 +2,23 @@ import * as cheerio from "cheerio";
 
 import { fetchManabaText, getManabaOrigin } from "../http.ts";
 import { manabaPathToUrl, openUrl } from "../open.ts";
+import {
+  optionalText,
+  pathFromUrl,
+  parseCourseSummary,
+  resolveUrl,
+  type ElementSelection,
+} from "./helpers.ts";
 
-import type {
-  CourseSummary,
-  SubmissionInfoJson,
-  SubmissionKind,
-  SubmissionListItemJson,
-} from "./types.ts";
+import type { SubmissionInfoJson, SubmissionKind, SubmissionListItemJson } from "./types.ts";
 import type { CheerioAPI } from "cheerio";
 
 const submissionListPath = "/ct/home_submitlog";
-const coursePathPattern = /\/ct\/course_([^_/?#]+)/;
 const taskPathPattern = /\/ct\/course_[^_]+_(report|query|survey|drill|project)_([^/?#]+)/;
 
-type ElementSelection = ReturnType<CheerioAPI>;
-
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function optionalText(text: string): string | undefined {
-  const normalized = normalizeText(text);
-
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized;
-}
-
-function textOf(element: ElementSelection): string {
-  return normalizeText(element.text());
-}
-
-function resolveUrl(rawHref: string, baseUrl: string): string {
-  return new URL(rawHref, baseUrl).toString();
-}
-
-function pathFromUrl(url: string): string {
-  const parsed = new URL(url);
-
-  return `${parsed.pathname}${parsed.search}`;
-}
-
-function extractCourseId(url: string): string | undefined {
-  return coursePathPattern.exec(pathFromUrl(url))?.[1];
-}
-
-function parseTaskPath(url: string): { kind: SubmissionKind; taskId: string } | undefined {
+function parseSubmissionTaskPath(
+  url: string,
+): { kind: SubmissionKind; taskId: string } | undefined {
   const match = taskPathPattern.exec(pathFromUrl(url));
   const rawKind = match?.[1];
   const taskId = match?.[2];
@@ -112,27 +81,6 @@ function taskKindSegment(kind: SubmissionKind): string {
 
 function slugifyDateTime(value: string): string {
   return value.replace(/\D+/g, "-").replace(/^-|-$/g, "");
-}
-
-function parseCourseSummary(anchor: ElementSelection, baseUrl: string): CourseSummary | undefined {
-  const href = anchor.attr("href");
-
-  if (href === undefined) {
-    return undefined;
-  }
-
-  const url = resolveUrl(href, baseUrl);
-  const id = extractCourseId(url);
-
-  if (id === undefined) {
-    return undefined;
-  }
-
-  return {
-    id,
-    name: textOf(anchor),
-    url,
-  };
 }
 
 function parseSubmittedAt(dateLabel: string, timeLabel: string): string | undefined {
@@ -198,7 +146,7 @@ function parseSubmissionRow(input: ParseSubmissionRowInput): {
 
   if (href !== undefined) {
     url = resolveUrl(href, input.baseUrl);
-    parsedTask = parseTaskPath(url);
+    parsedTask = parseSubmissionTaskPath(url);
   }
 
   const kind = parsedTask?.kind ?? kindFromLabel(statusLabel);

@@ -2,6 +2,16 @@ import * as cheerio from "cheerio";
 
 import { fetchManabaText, getManabaOrigin } from "../http.ts";
 import { manabaPathToUrl, openUrl } from "../open.ts";
+import {
+  extractIdFromUrl,
+  optionalText,
+  parseAttachmentLinks,
+  parseCourseHeaderSummary,
+  parseDateTime,
+  resolveUrl,
+  type ElementSelection,
+  textOf,
+} from "./helpers.ts";
 
 import type {
   AttachmentInfo,
@@ -16,73 +26,13 @@ import type { CheerioAPI } from "cheerio";
 const contentListPath = (courseId: string) => `/ct/course_${courseId}_page`;
 const contentPathPattern = /\/ct\/page_([^_/?#]+)/;
 const contentPagePathPattern = /\/ct\/page_[^_/?#]+_([^_/?#]+)/;
-const coursePathPattern = /\/ct\/course_([^_/?#]+)/;
-
-type ElementSelection = ReturnType<CheerioAPI>;
-
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function optionalText(text: string): string | undefined {
-  const normalized = normalizeText(text);
-
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized;
-}
-
-function textOf(element: ElementSelection): string {
-  return normalizeText(element.text());
-}
-
-function resolveUrl(rawHref: string, baseUrl: string): string {
-  return new URL(rawHref, baseUrl).toString();
-}
-
-function pathFromUrl(url: string): string {
-  const parsed = new URL(url);
-
-  return `${parsed.pathname}${parsed.search}`;
-}
-
-function extractCourseId(url: string): string | undefined {
-  return coursePathPattern.exec(pathFromUrl(url))?.[1];
-}
 
 function extractContentId(url: string): string | undefined {
-  return contentPathPattern.exec(pathFromUrl(url))?.[1];
+  return extractIdFromUrl(url, contentPathPattern);
 }
 
 function extractContentPageId(url: string): string | undefined {
-  return contentPagePathPattern.exec(pathFromUrl(url))?.[1];
-}
-
-function parseCourseHeader($: CheerioAPI, fallbackUrl: string): CourseSummary {
-  const header = $(".pageheader-course").first();
-  const nameAnchor = header.find(".pageheader-course-coursename a").first();
-  const href = nameAnchor.attr("href");
-
-  if (href !== undefined) {
-    const url = resolveUrl(href, fallbackUrl);
-    const id = extractCourseId(url);
-
-    if (id !== undefined) {
-      return {
-        id,
-        name: textOf(nameAnchor),
-        url,
-      };
-    }
-  }
-
-  return {
-    id: "",
-    name: optionalText(header.find(".pageheader-course-coursename").text()) ?? "",
-    url: fallbackUrl,
-  };
+  return extractIdFromUrl(url, contentPagePathPattern);
 }
 
 function parsePageCount(text: string): number | undefined {
@@ -94,10 +44,6 @@ function parsePageCount(text: string): number | undefined {
   }
 
   return Number.parseInt(rawPageCount, 10);
-}
-
-function parseDateTime(text: string): string | undefined {
-  return /\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?/.exec(text)?.[0];
 }
 
 function parsePublishedRange(text: string): {
@@ -134,7 +80,7 @@ function findContentAnchor(
     .find((anchor) => {
       const href = anchor.attr("href");
 
-      return href !== undefined && contentPathPattern.test(pathFromUrl(resolveUrl(href, baseUrl)));
+      return href !== undefined && extractContentId(resolveUrl(href, baseUrl)) !== undefined;
     });
 }
 
@@ -188,7 +134,12 @@ export async function listContents(courseId: string): Promise<ContentListItemJso
   const listUrl = manabaPathToUrl(contentListPath(courseId), origin);
   const html = await fetchManabaText(listUrl);
   const $ = cheerio.load(html);
-  const course = parseCourseHeader($, manabaPathToUrl(`/ct/course_${courseId}`, origin));
+  const fallbackCourse: CourseSummary = {
+    id: courseId,
+    name: "",
+    url: manabaPathToUrl(`/ct/course_${courseId}`, origin),
+  };
+  const course = parseCourseHeaderSummary($, fallbackCourse, { useHeaderNameFallback: true });
   const items: ContentListItemJson[] = [];
 
   $("table.contentslist")
@@ -260,36 +211,14 @@ function parsePages($: CheerioAPI, baseUrl: string): ContentPageSummary[] {
   return pages;
 }
 
-function parseAttachments($: CheerioAPI, baseUrl: string): AttachmentInfo[] {
-  const attachments: AttachmentInfo[] = [];
-  const seenUrls = new Set<string>();
-
-  $("a[href*='view=full'], a[href*='/ct/page_']").each((anchorIndex, anchor) => {
-    void anchorIndex;
-    const selection = $(anchor);
-    const href = selection.attr("href");
-    const name = optionalText(selection.text());
-
-    if (href === undefined || name === undefined || !href.includes("view=full")) {
-      return;
-    }
-
-    const url = resolveUrl(href, baseUrl);
-
-    if (seenUrls.has(url)) {
-      return;
-    }
-
-    seenUrls.add(url);
-
-    attachments.push({
-      name: name.replace(/\s*-?\s*\d{4}[-/]\d{1,2}[-/]\d{1,2}.*$/, ""),
-      uploadedAt: parseDateTime(name),
-      url,
-    });
+function parseContentAttachments($: CheerioAPI, baseUrl: string): AttachmentInfo[] {
+  return parseAttachmentLinks($, {
+    baseUrl,
+    isAttachmentHref: (href) => href.includes("view=full"),
+    parseUploadedAt: parseDateTime,
+    source: $("body"),
+    transformName: (name) => name.replace(/\s*-?\s*\d{4}[-/]\d{1,2}[-/]\d{1,2}.*$/, ""),
   });
-
-  return attachments;
 }
 
 function parseCurrentPage(
@@ -299,7 +228,7 @@ function parseCurrentPage(
 ): ContentPageInfo | undefined {
   const pageTitle =
     optionalText($(".contents-page-title, .page-title, h2").first().text()) ?? contentTitle;
-  const attachments = parseAttachments($, baseUrl);
+  const attachments = parseContentAttachments($, baseUrl);
   const pageUrl = baseUrl;
   const page: ContentPageInfo = {
     attachments,
@@ -336,7 +265,7 @@ export async function getContentInfo(id: string): Promise<ContentInfoJson> {
   const range = parsePublishedRange(documentText);
 
   return {
-    course: parseCourseHeader($, url),
+    course: parseCourseHeaderSummary($, { id: "", name: "", url }, { useHeaderNameFallback: true }),
     currentPage: parseCurrentPage($, url, title),
     id,
     pages: parsePages($, url),

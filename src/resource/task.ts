@@ -2,10 +2,19 @@ import * as cheerio from "cheerio";
 
 import { fetchManabaText, getManabaOrigin } from "../http.ts";
 import { manabaPathToUrl, openUrl } from "../open.ts";
+import {
+  optionalText,
+  parseAttachmentLinks,
+  parseCourseHeaderSummary,
+  parseCourseSummary,
+  pathFromUrl,
+  resolveUrl,
+  type ElementSelection,
+  textOf,
+} from "./helpers.ts";
 
 import type {
   AttachmentInfo,
-  CourseSummary,
   ReportTaskInfoJson,
   SurveyTaskInfoJson,
   TaskBaseInfoJson,
@@ -17,42 +26,7 @@ import type {
 import type { CheerioAPI } from "cheerio";
 
 const taskListPath = "/ct/home_library_query";
-const courseIdPattern = /\/ct\/course_([^_/?#]+)/;
 const taskPathPattern = /\/ct\/course_[^_]+_(report|query|survey)_([^/?#]+)/;
-
-type ElementSelection = ReturnType<CheerioAPI>;
-
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function optionalText(text: string): string | undefined {
-  const normalized = normalizeText(text);
-
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized;
-}
-
-function textOf(element: ElementSelection): string {
-  return normalizeText(element.text());
-}
-
-function resolveUrl(rawHref: string, baseUrl: string): string {
-  return new URL(rawHref, baseUrl).toString();
-}
-
-function pathFromUrl(url: string): string {
-  const parsed = new URL(url);
-
-  return `${parsed.pathname}${parsed.search}`;
-}
-
-function extractCourseId(url: string): string | undefined {
-  return courseIdPattern.exec(pathFromUrl(url))?.[1];
-}
 
 function parseTaskPath(url: string): { id: string; kind: TaskKind } | undefined {
   const match = taskPathPattern.exec(pathFromUrl(url));
@@ -96,27 +70,6 @@ function findTaskDetailAnchor($: CheerioAPI, row: ElementSelection): ElementSele
   }
 
   return undefined;
-}
-
-function parseCourseSummary(anchor: ElementSelection, baseUrl: string): CourseSummary | undefined {
-  const href = anchor.attr("href");
-
-  if (href === undefined) {
-    return undefined;
-  }
-
-  const url = resolveUrl(href, baseUrl);
-  const id = extractCourseId(url);
-
-  if (id === undefined) {
-    return undefined;
-  }
-
-  return {
-    id,
-    name: textOf(anchor),
-    url,
-  };
 }
 
 function parseTaskListRow(
@@ -202,29 +155,6 @@ async function findTaskListItem(id: string): Promise<TaskListItemJson> {
   return item;
 }
 
-function parseCourseHeader($: CheerioAPI, fallbackCourse: CourseSummary): CourseSummary {
-  const header = $(".pageheader-course").first();
-  const nameAnchor = header.find(".pageheader-course-coursename a").first();
-  const href = nameAnchor.attr("href");
-
-  if (href === undefined) {
-    return fallbackCourse;
-  }
-
-  const url = resolveUrl(href, fallbackCourse.url);
-  const id = extractCourseId(url);
-
-  if (id === undefined) {
-    return fallbackCourse;
-  }
-
-  return {
-    id,
-    name: textOf(nameAnchor),
-    url,
-  };
-}
-
 function parseDetailRows(
   $: CheerioAPI,
   table: ElementSelection,
@@ -305,30 +235,10 @@ function parseAttachments(
     return [];
   }
 
-  const attachments: AttachmentInfo[] = [];
-  const seenUrls = new Set<string>();
-
-  field.find("a[href]").each((anchorIndex, anchor) => {
-    void anchorIndex;
-    const selection = $(anchor);
-    const href = selection.attr("href");
-    const name = optionalText(selection.text());
-
-    if (href === undefined || name === undefined) {
-      return;
-    }
-
-    const url = resolveUrl(href, baseUrl);
-
-    if (seenUrls.has(url)) {
-      return;
-    }
-
-    seenUrls.add(url);
-    attachments.push({ name, url });
+  return parseAttachmentLinks($, {
+    baseUrl,
+    source: field,
   });
-
-  return attachments;
 }
 
 function parseReportUpload($: CheerioAPI): ReportTaskInfoJson["upload"] {
@@ -367,7 +277,7 @@ function createTaskBase(input: CreateTaskBaseInput): TaskBaseInfoJson {
 
   return {
     attachments: parseAttachments(input.$, input.fields.get("添付ファイル"), input.listItem.url),
-    course: parseCourseHeader(input.$, input.listItem.course),
+    course: parseCourseHeaderSummary(input.$, input.listItem.course),
     description: firstFieldText(input.fields, ["課題に関する説明"]),
     endsAt: firstFieldText(input.fields, ["受付終了日時"]),
     id: input.listItem.id,

@@ -2,6 +2,16 @@ import * as cheerio from "cheerio";
 
 import { fetchManabaText, getManabaOrigin } from "../http.ts";
 import { manabaPathToUrl, openUrl } from "../open.ts";
+import {
+  extractCourseId,
+  extractIdFromUrl,
+  normalizeText,
+  optionalText,
+  resolveUrl,
+  splitDelimitedText,
+  type ElementSelection,
+  textOf,
+} from "./helpers.ts";
 
 import type {
   ContentSummary,
@@ -13,68 +23,27 @@ import type {
 import type { CheerioAPI } from "cheerio";
 
 const courseListPath = "/ct/home_course";
-const coursePathPattern = /\/ct\/course_([^_/?#]+)/;
 const topicPathPattern = /\/ct\/course_[^_]+_topics_([^_/?#]+)_tflat/;
 const contentPathPattern = /\/ct\/page_([^_/?#]+)/;
 const courseNewsPathPattern = /\/ct\/course_[^_]+_news_([^/?#]+)/;
 
-type ElementSelection = ReturnType<CheerioAPI>;
 type CourseListItemDraft = Partial<CourseListItemJson> &
   Pick<CourseListItemJson, "id" | "name" | "url">;
 
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, " ").trim();
-}
-
-function optionalText(text: string): string | undefined {
-  const normalized = normalizeText(text);
-
-  if (normalized.length === 0) {
-    return undefined;
-  }
-
-  return normalized;
-}
-
-function textOf(element: ElementSelection): string {
-  return normalizeText(element.text());
-}
-
-function resolveUrl(rawHref: string, baseUrl: string): string {
-  return new URL(rawHref, baseUrl).toString();
-}
-
-function pathFromUrl(url: string): string {
-  const parsed = new URL(url);
-
-  return `${parsed.pathname}${parsed.search}`;
-}
-
-function extractCourseId(url: string): string | undefined {
-  return coursePathPattern.exec(pathFromUrl(url))?.[1];
-}
-
 function extractTopicId(url: string): string | undefined {
-  return topicPathPattern.exec(pathFromUrl(url))?.[1];
+  return extractIdFromUrl(url, topicPathPattern);
 }
 
 function extractContentId(url: string): string | undefined {
-  return contentPathPattern.exec(pathFromUrl(url))?.[1];
+  return extractIdFromUrl(url, contentPathPattern);
 }
 
 function extractCourseNewsId(url: string): string | undefined {
-  return courseNewsPathPattern.exec(pathFromUrl(url))?.[1];
+  return extractIdFromUrl(url, courseNewsPathPattern);
 }
 
 function splitInstructors(text: string | undefined): string[] {
-  if (text === undefined) {
-    return [];
-  }
-
-  return text
-    .split(/[、,，]/)
-    .map((item) => normalizeText(item))
-    .filter((item) => item.length > 0);
+  return splitDelimitedText(text, /[、,，]/);
 }
 
 function parseTermSchedule(text: string | undefined): { term?: string; schedule?: string } {
