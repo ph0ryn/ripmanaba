@@ -28,18 +28,18 @@ https://<manaba-domain>/ct/<path>
 
 確認したpath:
 
-| 画面 | path |
-| --- | --- |
-| ホーム | `/ct/home` |
-| コース一覧 | `/ct/home_course` |
-| 未提出課題一覧 | `/ct/home_library_query` |
-| 提出記録 | `/ct/home_submitlog` |
-| ポートフォリオ | `/ct/home_coursetable` |
-| コース詳細 | `/ct/course_<course-id>` |
-| レポート一覧 | `/ct/course_<course-id>_report` |
-| レポート詳細 | `/ct/course_<course-id>_report_<report-id>` |
-| 小テスト一覧 | `/ct/course_<course-id>_query` |
-| 小テスト詳細 | `/ct/course_<course-id>_query_<query-id>` |
+| 画面           | path                                        |
+| -------------- | ------------------------------------------- |
+| ホーム         | `/ct/home`                                  |
+| コース一覧     | `/ct/home_course`                           |
+| 未提出課題一覧 | `/ct/home_library_query`                    |
+| 提出記録       | `/ct/home_submitlog`                        |
+| ポートフォリオ | `/ct/home_coursetable`                      |
+| コース詳細     | `/ct/course_<course-id>`                    |
+| レポート一覧   | `/ct/course_<course-id>_report`             |
+| レポート詳細   | `/ct/course_<course-id>_report_<report-id>` |
+| 小テスト一覧   | `/ct/course_<course-id>_query`              |
+| 小テスト詳細   | `/ct/course_<course-id>_query_<query-id>`   |
 
 ## 共通で表示される情報
 

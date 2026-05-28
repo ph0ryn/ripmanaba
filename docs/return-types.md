@@ -285,10 +285,7 @@ export type ContentSummary = {
 報を返す。課題種別ごとに表示項目が異なるため、共通部分と種別別の差分に分ける。
 
 ```ts
-export type TaskInfoJson =
-  | ReportTaskInfoJson
-  | QuizTaskInfoJson
-  | SurveyTaskInfoJson;
+export type TaskInfoJson = ReportTaskInfoJson | QuizTaskInfoJson | SurveyTaskInfoJson;
 
 export type TaskKind = "report" | "quiz" | "survey";
 
@@ -559,13 +556,7 @@ export type SubmissionInfoJson = {
   detailText?: string;
 };
 
-export type SubmissionKind =
-  | "quiz"
-  | "survey"
-  | "drill"
-  | "report"
-  | "project"
-  | "unknown";
+export type SubmissionKind = "quiz" | "survey" | "drill" | "report" | "project" | "unknown";
 ```
 
 例:
