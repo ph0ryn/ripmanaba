@@ -84,7 +84,9 @@ async function waitForUserLogin(): Promise<void> {
   const readline = createInterface({ input, output });
 
   try {
-    await readline.question("Open manaba in the browser, log in, then press Enter here.");
+    await readline.question(
+      "Open manaba in the browser, log in, then return to this terminal and press Enter.",
+    );
   } finally {
     readline.close();
   }
@@ -100,6 +102,7 @@ async function authenticate(): Promise<void> {
       await context.newPage();
     }
 
+    await context.pages()[0]?.bringToFront();
     await waitForUserLogin();
 
     const currentUrl = findOpenPageUrl(context);

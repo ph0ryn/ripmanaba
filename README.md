@@ -12,7 +12,8 @@ bun i -g ripmanaba
 
 ## Usage
 
-ブラウザが立ち上がってユーザーが手動でログイン
+ブラウザが立ち上がる。ユーザーがURLを入力してmanabaに移動し、ログインでき
+たらterminalに戻ってEnterを押す。
 
 ```sh
 ripmanaba auth
