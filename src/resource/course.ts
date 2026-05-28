@@ -19,6 +19,8 @@ const contentPathPattern = /\/ct\/page_([^_/?#]+)/;
 const courseNewsPathPattern = /\/ct\/course_[^_]+_news_([^/?#]+)/;
 
 type ElementSelection = ReturnType<CheerioAPI>;
+type CourseListItemDraft = Partial<CourseListItemJson> &
+  Pick<CourseListItemJson, "id" | "name" | "url">;
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -88,6 +90,27 @@ function parseTermSchedule(text: string | undefined): { term?: string; schedule?
   };
 }
 
+function mergeCourseListItem(
+  itemsById: Map<string, CourseListItemDraft>,
+  item: CourseListItemDraft | undefined,
+): void {
+  if (item === undefined) {
+    return;
+  }
+
+  const current = itemsById.get(item.id);
+
+  itemsById.set(item.id, {
+    id: item.id,
+    instructors: item.instructors ?? current?.instructors,
+    name: item.name,
+    schedule: item.schedule ?? current?.schedule,
+    term: item.term ?? current?.term,
+    url: item.url,
+    year: item.year ?? current?.year,
+  });
+}
+
 function parseCourseListRow(
   $: CheerioAPI,
   row: ElementSelection,
@@ -136,27 +159,151 @@ function parseCourseListRow(
   };
 }
 
+function parseCourseCard(
+  $: CheerioAPI,
+  card: ElementSelection,
+  baseUrl: string,
+): CourseListItemDraft | undefined {
+  const courseAnchor = card
+    .find("a[href]")
+    .toArray()
+    .map((anchor) => $(anchor))
+    .find((anchor) => {
+      const href = anchor.attr("href");
+
+      return href !== undefined && extractCourseId(resolveUrl(href, baseUrl)) !== undefined;
+    });
+  const href = courseAnchor?.attr("href");
+
+  if (courseAnchor === undefined || href === undefined) {
+    return undefined;
+  }
+
+  const url = resolveUrl(href, baseUrl);
+  const id = extractCourseId(url);
+
+  if (id === undefined) {
+    return undefined;
+  }
+
+  const detailsText = textOf(card);
+  const metaMatch = /時限\s+(\d{4})\s+(\S+)\s+(.+?)\s+担当\s+(.+?)(?:\s+シラバス|$)/.exec(
+    detailsText,
+  );
+
+  return {
+    id,
+    instructors: splitInstructors(metaMatch?.[4]),
+    name: textOf(courseAnchor),
+    schedule: optionalText(metaMatch?.[3] ?? ""),
+    term: metaMatch?.[2],
+    url,
+    year: metaMatch?.[1],
+  };
+}
+
+function parseTimetableCourses(
+  $: CheerioAPI,
+  table: ElementSelection,
+  baseUrl: string,
+): CourseListItemDraft[] {
+  const rows = table.find("tr");
+  const dayLabels = rows
+    .first()
+    .find("th,td")
+    .toArray()
+    .map((cell) => textOf($(cell)));
+  const items: CourseListItemDraft[] = [];
+
+  rows.slice(1).each((rowIndex, row) => {
+    void rowIndex;
+    const cells = $(row).find("th,td");
+    const period = textOf(cells.first());
+
+    cells.slice(1).each((cellIndex, cell) => {
+      const day = dayLabels[cellIndex + 1];
+      let schedule: string | undefined = undefined;
+
+      if (day !== undefined && period.length > 0) {
+        schedule = `${day}${period}`;
+      }
+
+      $(cell)
+        .find("a[href]")
+        .each((anchorIndex, anchor) => {
+          void anchorIndex;
+          const selection = $(anchor);
+          const href = selection.attr("href");
+          const name = optionalText(selection.text());
+
+          if (href === undefined || name === undefined) {
+            return;
+          }
+
+          const url = resolveUrl(href, baseUrl);
+          const id = extractCourseId(url);
+
+          if (id === undefined) {
+            return;
+          }
+
+          items.push({
+            id,
+            name,
+            schedule,
+            url,
+          });
+        });
+    });
+  });
+
+  return items;
+}
+
+function parseCourseListDocument($: CheerioAPI, baseUrl: string): CourseListItemDraft[] {
+  const itemsById = new Map<string, CourseListItemDraft>();
+
+  $("table.stdlist.courselist")
+    .find("tr")
+    .slice(1)
+    .each((rowIndex, row) => {
+      void rowIndex;
+      mergeCourseListItem(itemsById, parseCourseListRow($, $(row), baseUrl));
+    });
+
+  $(".coursecard").each((cardIndex, card) => {
+    void cardIndex;
+    mergeCourseListItem(itemsById, parseCourseCard($, $(card), baseUrl));
+  });
+
+  $("table.stdlist")
+    .not(".courselist")
+    .each((tableIndex, table) => {
+      void tableIndex;
+
+      for (const item of parseTimetableCourses($, $(table), baseUrl)) {
+        mergeCourseListItem(itemsById, item);
+      }
+    });
+
+  return [...itemsById.values()];
+}
+
 export async function listCourses(): Promise<CourseListItemJson[]> {
   const origin = await getManabaOrigin();
   const listUrl = manabaPathToUrl(courseListPath, origin);
   const html = await fetchManabaText(listUrl);
   const $ = cheerio.load(html);
-  const items: CourseListItemJson[] = [];
 
-  $("table.stdlist.courselist")
-    .first()
-    .find("tr")
-    .slice(1)
-    .each((rowIndex, row) => {
-      void rowIndex;
-      const item = parseCourseListRow($, $(row), listUrl);
-
-      if (item !== undefined) {
-        items.push(item);
-      }
-    });
-
-  return items;
+  return parseCourseListDocument($, listUrl).map((item) => ({
+    id: item.id,
+    instructors: item.instructors ?? [],
+    name: item.name,
+    schedule: item.schedule,
+    term: item.term,
+    url: item.url,
+    year: item.year,
+  }));
 }
 
 function parseHeaderMeta($: CheerioAPI): {
