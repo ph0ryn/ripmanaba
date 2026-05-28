@@ -320,8 +320,6 @@ export type ReportTaskInfoJson = TaskBaseInfoJson & {
   resubmissionAllowed?: boolean;
   upload: {
     enabled: boolean;
-    maxFileSizeLabel?: string;
-    selectedFileLabel?: string;
   };
 };
 
@@ -365,9 +363,7 @@ export type SurveyTaskInfoJson = TaskBaseInfoJson & {
   "portfolioSetting": "ポートフォリオに追加しない / 回収のみ行なう・コメント不可",
   "resubmissionAllowed": false,
   "upload": {
-    "enabled": true,
-    "maxFileSizeLabel": "１ファイルにつき 50Mバイトまで",
-    "selectedFileLabel": "アップロードファイルが指定されていません。"
+    "enabled": true
   }
 }
 ```

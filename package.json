@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "cac": "^6.7.14",
+    "cheerio": "catalog:",
     "playwright": "^1.57.0"
   },
   "devDependencies": {
