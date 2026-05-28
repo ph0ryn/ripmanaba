@@ -15,6 +15,9 @@ catalogs:
     cheerio:
       specifier: ^1.2.0
       version: 1.2.0
+    clean-pkg-json:
+      specifier: ^1.4.2
+      version: 1.4.2
     eslint:
       specifier: ^10.3.0
       version: 10.3.0
@@ -66,6 +69,9 @@ importers:
       '@typescript/native-preview':
         specifier: 'catalog:'
         version: 7.0.0-dev.20260430.1
+      clean-pkg-json:
+        specifier: 'catalog:'
+        version: 1.4.2
       eslint:
         specifier: 'catalog:'
         version: 10.3.0
@@ -590,6 +596,10 @@ packages:
   cheerio@1.2.0:
     resolution: {integrity: sha512-WDrybc/gKFpTYQutKIK6UvfcuxijIZfMfXaYm8NMsPQxSYvf+13fXUJ4rztGGbJcBQ/GF55gvrZ0Bc0bj/mqvg==}
     engines: {node: '>=20.18.1'}
+
+  clean-pkg-json@1.4.2:
+    resolution: {integrity: sha512-o201s9wWOYoZSRui4QyARSFc3n0IcYDu62hkJCQGX1eshSSQ/90QhS/KveWp/QlXSqcF/g/q2+IINj25V1BMKw==}
+    hasBin: true
 
   cli-cursor@5.0.0:
     resolution: {integrity: sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw==}
@@ -1462,6 +1472,8 @@ snapshots:
       parse5-parser-stream: 7.1.2
       undici: 7.26.0
       whatwg-mimetype: 4.0.0
+
+  clean-pkg-json@1.4.2: {}
 
   cli-cursor@5.0.0:
     dependencies:
