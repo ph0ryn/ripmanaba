@@ -13,7 +13,8 @@
 
 - `ls`: 一覧を表示する
 - `info <id>`: 詳細をJSONで表示する
-- `open <id>`: 対応するmanaba画面をブラウザで開く
+- `open <id>`: `info <id>` が返す `url` と同じ算出でmanaba画面をブラウザで
+  開く
 
 複数形と単数形の違いでoperationを表現しない。
 
@@ -113,6 +114,11 @@ operation:
 - `info <id>`
 - `open <id>`
 
+`ls` と `info` が返すJSONには、各resourceの情報源となるmanaba画面の絶対URL
+を `url` として必ず含める。originを除いた `path` は返却JSONに含めない。
+`open` は `info` の `url` を保存して使うのではなく、同じURL算出ロジックで
+対象画面を開く。
+
 `content`、`notice`、`submission` は追加候補であり、初期実装では必須にしな
 い。
 
@@ -128,7 +134,7 @@ operation:
 
 ## IDの扱い
 
-ユーザーに渡すIDは、manabaのpathから抽出できるIDを基本にする。
+ユーザーに渡すIDは、manabaのURL pathから抽出できるIDを基本にする。
 
 例:
 

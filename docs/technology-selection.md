@@ -8,7 +8,7 @@ ripmanaba の初期技術選定。
 録する。
 
 現時点では、manabaの主要画面がserver-rendered HTMLとして取得できる前提で
-実装に進む。DOM構造、path、返却JSON型は `docs/` に整理済みであり、追加の
+実装に進む。DOM構造、URL/path、返却JSON型は `docs/` に整理済みであり、追加の
 PoC実装は行わない。実装中に不確実な画面やclient-side rendering依存が見つ
 かった場合のみ、目的を絞ったPoCを作る。
 
@@ -62,8 +62,9 @@ See [CLIコマンド設計](./cli-command-design.md).
 - 対象ページが client-side rendering を必要とすると後から判明しない限り、
   通常の認証済みスクレイピングでは Playwright、Chromium、その他のブラウザ
   自動化を使わない。
-- スクレイピングしたリンクは、`ManabaPath` を抽出する前に取得元ページの
-  URL を基準に正規化する。
+- スクレイピングしたリンクは、取得元ページのURLを基準に正規化する。
+- 返却JSONにはoriginを除いたpathを含めず、情報源となるmanaba画面の絶対URL
+  を `url` として含める。
 - ブラウザ自動化は調査用ツールとして残すが、runtime の標準スクレイピング
   手段にはしない。
 
@@ -86,7 +87,7 @@ See [CLIコマンド設計](./cli-command-design.md).
 ## 調査結果
 
 1. スクレイピング調査用の専用 branch で manaba のページ構造を調べた。
-2. ページ構造、path、selector、ID抽出方法を `docs/` に記録した。
+2. ページ構造、URL/path、selector、ID抽出方法を `docs/` に記録した。
 3. 対象 workflow の返却JSON型を `docs/return-types.md` に定義した。
 4. 通常コマンドはfetch + HTML parseで進める方針に決定した。
 5. PoC実装は作らず、実装中に未確認箇所が見つかった場合だけ追加調査する。

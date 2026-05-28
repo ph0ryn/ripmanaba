@@ -173,7 +173,7 @@ async function openUrl(url: string): Promise<void> {
 interface ResourceCommandConfig {
   name: string;
   aliases?: string[];
-  openPath?: (id: string) => string;
+  infoPath?: (id: string) => string;
 }
 
 type ResourceOperation = "ls" | "info" | "open";
@@ -215,11 +215,11 @@ async function runResourceCommand(
     throw new Error(`${config.name} info is not implemented yet.`);
   }
 
-  if (config.openPath === undefined) {
+  if (config.infoPath === undefined) {
     throw new Error(`${config.name} open is not implemented yet.`);
   }
 
-  await openManabaPath(config.openPath(resourceId));
+  await openManabaPath(config.infoPath(resourceId));
 }
 
 function registerResourceCommands(config: ResourceCommandConfig): void {
@@ -238,8 +238,8 @@ cli
 
 registerResourceCommands({
   aliases: ["crs"],
+  infoPath: (id) => `course_${id}`,
   name: "course",
-  openPath: (id) => `course_${id}`,
 });
 
 registerResourceCommands({ name: "task" });
