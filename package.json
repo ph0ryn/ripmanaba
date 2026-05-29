@@ -1,6 +1,6 @@
 {
   "name": "ripmanaba",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "CLI for accessing the manaba learning management service.",
   "repository": {
     "type": "git",
