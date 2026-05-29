@@ -202,13 +202,7 @@ export type SubmissionListItemJson = {
 す。返り値はラップしない配列とし、赤アイコンがないコースは含めない。
 
 ```ts
-export type CourseStatusKind =
-  | "news"
-  | "deadline"
-  | "grade"
-  | "thread"
-  | "individual"
-  | "unknown";
+export type CourseStatusKind = "news" | "deadline" | "grade" | "thread" | "individual" | "unknown";
 
 export type NewCourseStatusJson = {
   course: CourseSummary;

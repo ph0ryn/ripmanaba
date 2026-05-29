@@ -190,3 +190,10 @@ export interface SubmissionInfoJson extends SubmissionListItemJson {
   resource: "submission";
   detailText?: string;
 }
+
+export type CourseStatusKind = "news" | "deadline" | "grade" | "thread" | "individual" | "unknown";
+
+export interface NewCourseStatusJson {
+  course: CourseSummary;
+  kinds: CourseStatusKind[];
+}

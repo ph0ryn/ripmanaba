@@ -65,7 +65,7 @@ function shouldVerifyAuthenticatedSession(): boolean {
   return (
     commandName !== undefined &&
     commandName !== "auth" &&
-    (operation === "ls" || operation === "info")
+    (commandName === "new" || operation === "ls" || operation === "info")
   );
 }
 

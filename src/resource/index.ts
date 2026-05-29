@@ -1,5 +1,6 @@
 import { getContentInfo, listContents, openContent } from "./content.ts";
 import { getCourseInfo, listCourses, openCourse } from "./course.ts";
+import { listNewCourseStatuses } from "./new.ts";
 import { getNoticeInfo, listNotices, openNotice } from "./notice.ts";
 import { getSubmissionInfo, listSubmissions, openSubmission } from "./submission.ts";
 import { getTaskInfo, listTasks, openTask } from "./task.ts";
@@ -142,6 +143,10 @@ async function runSubmissionCommand(operation: string, id: string | undefined): 
   await openSubmission(resourceId);
 }
 
+async function runNewCommand(): Promise<void> {
+  printJson(await listNewCourseStatuses());
+}
+
 function registerResourceCommands(
   cli: CAC,
   config: ResourceCommandConfig,
@@ -173,4 +178,6 @@ export function registerResourceCli(cli: CAC): void {
   registerResourceCommands(cli, { name: "notice" }, runNoticeCommand);
 
   registerResourceCommands(cli, { name: "submission" }, runSubmissionCommand);
+
+  cli.command("new", "List active course statuses on home").action(runNewCommand);
 }

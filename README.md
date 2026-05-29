@@ -68,6 +68,12 @@ ripmanaba submission [op]
   open [submission ID]
 ```
 
+未読・未処理関連
+
+```sh
+ripmanaba new
+```
+
 ## Requirements
 
 - Bun: for runtime

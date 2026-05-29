@@ -116,8 +116,9 @@ const roots = document.querySelectorAll(".courselistweekly-c, tr.courselist-c");
 const items = [...roots]
   .map((root) => {
     const courseAnchor = [...root.querySelectorAll("a[href]")].find((anchor) =>
-      new URL(anchor.getAttribute("href") ?? "", document.baseURI).pathname
-        .match(/\/ct\/course_(\d+)$/),
+      new URL(anchor.getAttribute("href") ?? "", document.baseURI).pathname.match(
+        /\/ct\/course_(\d+)$/,
+      ),
     );
 
     const kinds = [...root.querySelectorAll(".coursestatus img, .course-card-status img")]
