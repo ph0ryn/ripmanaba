@@ -75,6 +75,64 @@ IDは原則としてpathから抽出する。
 `/ct/home_favoritecourse_<course-id>_set___` または画像altから推定できる。
 ただし初期実装では任意項目に留める。
 
+## new
+
+入口path:
+
+```text
+/ct/home
+```
+
+ホーム画面のコース一覧に表示される赤い未読・未処理アイコンを読む。確認時点
+では、曜日表示の `.courselistweekly-c` とリスト表示の `tr.courselist-c` の
+どちらにも同じ状態アイコン群が出る。実装では両方を候補にし、course IDで重
+複排除する。
+
+コースリンクは対象要素内の `a[href]` から、正規化後pathが
+`/ct/course_<course-id>` に一致するものを選ぶ。
+
+状態アイコンは次のcontainer内の `img` を読む。
+
+- 曜日表示: `.coursestatus img`
+- リスト表示: `.course-card-status img`
+
+`src` が `-on.png` または `_on.png` で終わるものをactiveとして扱う。active
+でないiconは返却JSONに含めない。activeなiconから `kind` だけを返し、
+`alt` や `title` の文言は返却JSONに含めない。
+
+確認できたiconと `kind` の対応:
+
+- `icon_coursenews`: `news`
+- `icon-coursedeadline`: `deadline`
+- `icon-coursegrad`: `grade`
+- `icon_coursethread`: `thread`
+- `icon_collist_individual`: `individual`
+
+取得例の疑似コード:
+
+```ts
+const roots = document.querySelectorAll(".courselistweekly-c, tr.courselist-c");
+
+const items = [...roots]
+  .map((root) => {
+    const courseAnchor = [...root.querySelectorAll("a[href]")].find((anchor) =>
+      new URL(anchor.getAttribute("href") ?? "", document.baseURI).pathname
+        .match(/\/ct\/course_(\d+)$/),
+    );
+
+    const kinds = [...root.querySelectorAll(".coursestatus img, .course-card-status img")]
+      .filter((img) => /(?:-|_)on\.png$/.test(img.getAttribute("src") ?? ""))
+      .map((img) => statusKindFromIcon(img.getAttribute("src") ?? ""));
+
+    return { courseAnchor, kinds };
+  })
+  .filter((item) => item.courseAnchor && item.kinds.length > 0);
+```
+
+`/ct/home` のnetworkは通常のdocument取得と画像・CSS・JS assetが中心で、赤
+アイコン状態はHTML内に描画済みだった。現時点では追加のXHRやfetchを前提に
+しない。
+
 ## task ls
 
 入口path:

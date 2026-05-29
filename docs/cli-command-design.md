@@ -52,6 +52,10 @@ ripmanaba <resource> <operation> [id]
 - `notice`
 - `submission`
 
+追加operation:
+
+- `new`: ホーム画面のコース一覧に出る未読・未処理ステータスを返す
+
 ## Resource一覧
 
 実装予定なしのものも含め、manaba側の意味的なresourceとCLI上の扱いを整理す
@@ -64,6 +68,7 @@ ripmanaba <resource> <operation> [id]
 | コースコンテンツ | `content`       | 実装済み | `course content` にはしない               |
 | 全体お知らせ     | `notice`        | 実装済み | コースニュースとは別resource              |
 | 提出記録         | `submission`    | 実装済み | 複数コース横断の提出配列として扱う        |
+| 未読・未処理     | `new`           | 追加候補 | homeのコース赤アイコンを横断配列にする    |
 | コースニュース   | 未定            | 追加候補 | `notice` に含めるか別resourceにするか未定 |
 | 小テスト         | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
 | アンケート       | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
@@ -85,6 +90,7 @@ ripmanaba <resource> <operation> [id]
 ```text
 ripmanaba
 ├── auth
+├── new
 ├── <resource>
 │   └── <operation> [id]
 └── <alias>
@@ -120,6 +126,11 @@ operation:
 `content ls` はコース内のコンテンツ一覧を対象にするため、`id` に
 `course-id` を渡す。
 
+`ripmanaba new` はresource配下のoperationではなく、homeに出るコース別の未
+読・未処理ステータスを横断して返すショートカットとして扱う。対象は
+`/ct/home` のコース一覧に表示される赤アイコンで、初期実装ではコースニュー
+スと未提出課題を主対象にする。
+
 ## Resourceごとの情報源
 
 | resource     | 主な画面                     | 主なpath                                                            |
@@ -129,6 +140,7 @@ operation:
 | `content`    | コース詳細、コースコンテンツ | `/ct/course_<course-id>_page`, `/ct/page_<content-id>`              |
 | `notice`     | ホーム、お知らせ詳細         | `/ct/home`, `/ct/home_campusnews_<notice-id>`                       |
 | `submission` | 提出記録                     | `/ct/home_submitlog`                                                |
+| `new`        | ホーム                       | `/ct/home`                                                          |
 
 ## IDの扱い
 

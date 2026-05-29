@@ -196,6 +196,41 @@ export type SubmissionListItemJson = {
 []
 ```
 
+## new
+
+`ripmanaba new` はホーム画面のコース一覧に出る未読・未処理ステータスを返
+す。返り値はラップしない配列とし、赤アイコンがないコースは含めない。
+
+```ts
+export type CourseStatusKind =
+  | "news"
+  | "deadline"
+  | "grade"
+  | "thread"
+  | "individual"
+  | "unknown";
+
+export type NewCourseStatusJson = {
+  course: CourseSummary;
+  kinds: CourseStatusKind[];
+};
+```
+
+例:
+
+```json
+[
+  {
+    "course": {
+      "id": "2766671",
+      "name": "EEORG211産業組織論1",
+      "url": "https://mgu.manaba.jp/ct/course_2766671"
+    },
+    "kinds": ["news", "deadline"]
+  }
+]
+```
+
 ## course
 
 `course info` はコース詳細画面から取得できる情報を返す。
