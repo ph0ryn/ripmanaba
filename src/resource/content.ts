@@ -145,7 +145,6 @@ export async function listContents(courseId: string): Promise<ContentListItemJso
   $("table.contentslist")
     .first()
     .find("tr")
-    .slice(1)
     .each((rowIndex, row) => {
       void rowIndex;
       const item = parseContentListRow({
