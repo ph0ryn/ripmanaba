@@ -1,11 +1,10 @@
 # ripmanaba
 
-学習管理サービスmanabaにアクセスするCLI
+A minimal CLI app which accesses manaba and returns JSON
 
 ## Installation
 
 ```sh
-npm i -g ripmanaba
 pnpm add -g ripmanaba
 bun i -g ripmanaba
 ```
@@ -23,55 +22,55 @@ ripmanaba auth
 HTTP requestで再利用するstorage stateは `~/.ripmanaba/storage-state.json`
 に保存される。
 
-コース(履修科目)関連
-
-```sh
-ripmanaba course|crs [op]
-  ls                # list
-  info [course ID]  # return JSON
-  open [course ID]  # open the URL in the browser
-```
-
-未提出課題関連
-
-```sh
-ripmanaba task [op]
-  ls
-  info [task ID]
-  open [task ID]
-```
-
-コースコンテンツ関連
-
-```sh
-ripmanaba content [op]
-  ls [course ID]
-  info [content ID]
-  open [content ID]
-```
-
-全体お知らせ関連
-
-```sh
-ripmanaba notice [op]
-  ls
-  info [notice ID]
-  open [notice ID]
-```
-
-提出記録関連
-
-```sh
-ripmanaba submission [op]
-  ls
-  info [submission ID]
-  open [submission ID]
-```
-
-未読・未処理関連
+ホーム画面の未読通知
 
 ```sh
 ripmanaba new
+```
+
+コース
+
+```sh
+ripmanaba course|crs
+  ls
+  info <course-id>
+  open <course-id>
+```
+
+未提出課題
+
+```sh
+ripmanaba task
+  ls
+  info <task-id>
+  open <task-id>
+```
+
+コースコンテンツ
+
+```sh
+ripmanaba content
+  ls <course-id>
+  info <content-id>
+  open <content-id>
+```
+
+全体お知らせ
+
+```sh
+ripmanaba notice
+  ls
+  info <notice-id>
+  open <notice-id>
+```
+
+提出記録
+
+```sh
+ripmanaba submission
+  ls
+  info <submission-id>
+  open <submission-id>
 ```
 
 ## Requirements
