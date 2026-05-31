@@ -11,6 +11,8 @@ import {
   writeSessionConfig,
 } from "./session.ts";
 
+const sessionRefreshTimeout = 30_000;
+
 function normalizeOrigin(url: string): string {
   return new URL(url).origin;
 }
@@ -82,7 +84,7 @@ export async function authenticate(): Promise<void> {
       return;
     }
 
-    await writeBrowserStorageState(context);
+    await writeBrowserStorageState(context, storageStateFile);
 
     await writeSessionConfig({
       authenticatedAt: new Date().toISOString(),
@@ -106,7 +108,12 @@ export async function refreshAuthenticatedSession(config: SessionConfig): Promis
     const page = context.pages()[0] ?? (await context.newPage());
 
     await page.goto(new URL("/ct/home", config.origin).toString());
-    await writeBrowserStorageState(context);
+
+    await page.waitForURL((url) => url.origin === config.origin, {
+      timeout: sessionRefreshTimeout,
+    });
+
+    await writeBrowserStorageState(context, config.storageStateFile);
   } finally {
     await context.close();
   }

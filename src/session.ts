@@ -47,7 +47,10 @@ export async function writeSessionConfig(config: SessionConfig): Promise<void> {
   await writeFile(sessionFile, `${JSON.stringify(config, undefined, 2)}\n`);
 }
 
-export async function writeBrowserStorageState(context: BrowserContext): Promise<void> {
-  await ensureParentDirectory(storageStateFile);
-  await context.storageState({ path: storageStateFile });
+export async function writeBrowserStorageState(
+  context: BrowserContext,
+  path: string,
+): Promise<void> {
+  await ensureParentDirectory(path);
+  await context.storageState({ path });
 }
