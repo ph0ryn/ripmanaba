@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 
 import {
   browserProfileDirectory,
+  type SessionConfig,
   storageStateFile,
   writeBrowserStorageState,
   writeSessionConfig,
@@ -91,6 +92,21 @@ export async function authenticate(): Promise<void> {
     });
 
     console.log(`Saved manaba session for ${origin}`);
+  } finally {
+    await context.close();
+  }
+}
+
+export async function refreshAuthenticatedSession(config: SessionConfig): Promise<void> {
+  const context = await chromium.launchPersistentContext(config.browserProfileDirectory, {
+    headless: true,
+  });
+
+  try {
+    const page = context.pages()[0] ?? (await context.newPage());
+
+    await page.goto(new URL("/ct/home", config.origin).toString());
+    await writeBrowserStorageState(context);
   } finally {
     await context.close();
   }

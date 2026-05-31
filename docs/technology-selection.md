@@ -45,7 +45,9 @@ See [CLIコマンド設計](./cli-command-design.md).
 - セッション永続化には Playwright の persistent browser context を使う。
 - ブラウザ状態は ripmanaba 専用 profile directory に保存する。
 - ユーザーの default Chrome profile は自動操作しない。
-- 認証後の通常コマンドではブラウザ自動化を使わない。
+- 認証後の通常コマンドではブラウザ自動化を使わない。ただし、直接 HTTP
+  request が認証画面へ redirect された場合に限り、session refresh のため
+  headless Chromium を1回だけ使う。
 
 想定 profile location:
 
@@ -75,6 +77,12 @@ See [CLIコマンド設計](./cli-command-design.md).
 - 認証済みブラウザ状態は専用 profile directory に保持する。
 - 以後のコマンドは、認証済みセッション情報を直接 HTTP request に再利用す
   る。
+- 通常コマンドの HTTP request が認証画面へ redirect された場合は、専用
+  profile directory を使って headless Chromium で `/ct/home` を開き、
+  storage state を保存し直す。
+- session refresh 後は、最初に要求された HTTP request を1回だけ再実行する。
+- session refresh 後も認証画面へ redirect された場合は、ユーザーに
+  `ripmanaba auth` の再実行を求める。
 
 ## 未決定事項
 

@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { refreshAuthenticatedSession } from "./auth.ts";
 import { requireSessionConfig, type SessionConfig } from "./session.ts";
 
 interface StorageStateCookie {
@@ -39,11 +40,19 @@ async function buildCookieHeader(config: SessionConfig): Promise<string> {
 export async function fetchManabaText(pathOrUrl: string): Promise<string> {
   const config = await requireSessionConfig();
   const url = new URL(pathOrUrl, config.origin);
-  const cookie = await buildCookieHeader(config);
-  const response = await fetch(url, { headers: { cookie } });
+  let response = await fetchWithSession(url, config);
+
+  if (new URL(response.url).origin !== config.origin) {
+    await refreshAuthenticatedSession(config);
+    response = await fetchWithSession(url, config);
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url.toString()}: ${response.status}`);
+  }
+
+  if (new URL(response.url).origin !== config.origin) {
+    throw new Error("Saved session is not authenticated. Run ripmanaba auth again.");
   }
 
   return response.text();
@@ -51,4 +60,10 @@ export async function fetchManabaText(pathOrUrl: string): Promise<string> {
 
 export async function getManabaOrigin(): Promise<string> {
   return (await requireSessionConfig()).origin;
+}
+
+async function fetchWithSession(url: URL, config: SessionConfig): Promise<Response> {
+  const cookie = await buildCookieHeader(config);
+
+  return fetch(url, { headers: { cookie } });
 }
