@@ -22,7 +22,7 @@ JSONのTypeScript型を定義する。
 export type Config = {
   version: number;
   origin: string;
-  browser: "chrome" | "edge" | "firefox" | "safari";
+  browser: "chrome" | "chromium" | "edge" | "firefox" | "safari";
   profile?: string;
 };
 ```

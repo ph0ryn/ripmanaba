@@ -43,3 +43,26 @@ test("configuration persists metadata only with restrictive permissions", async 
     await rm(directory, { recursive: true });
   }
 });
+
+test("Chromium selection round-trips through version 1 configuration", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ripmanaba-chromium-config-"));
+  const path = join(directory, "config.json");
+  const config = {
+    browser: "chromium",
+    origin: "https://mgu.manaba.jp",
+    profile: "/custom/chromium/Default",
+    version: 1,
+  };
+
+  try {
+    await writeFile(path, JSON.stringify(config));
+    const saved = await readSessionConfig(path);
+
+    assert.ok(saved);
+    assert.deepEqual(saved, config);
+    await writeSessionConfig(saved, path);
+    assert.deepEqual(await readSessionConfig(path), config);
+  } finally {
+    await rm(directory, { recursive: true });
+  }
+});

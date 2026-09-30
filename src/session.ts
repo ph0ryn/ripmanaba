@@ -14,7 +14,7 @@ export const sessionFile = join(
 export interface SessionConfig {
   version: 1;
   origin: string;
-  browser: BrowserName;
+  browser: BrowserName | "chromium";
   profile?: string;
 }
 
@@ -38,12 +38,18 @@ export function normalizeManabaOrigin(value: string): string {
   return url.origin;
 }
 
-export function parseBrowser(value: string): BrowserName {
-  if (value === "chrome" || value === "edge" || value === "firefox" || value === "safari") {
+export function parseBrowser(value: string): SessionConfig["browser"] {
+  if (
+    value === "chrome" ||
+    value === "chromium" ||
+    value === "edge" ||
+    value === "firefox" ||
+    value === "safari"
+  ) {
     return value;
   }
 
-  throw new Error("Browser must be chrome, edge, firefox or safari.");
+  throw new Error("Browser must be chrome, chromium, edge, firefox or safari.");
 }
 
 export function validateSessionConfig(value: unknown): SessionConfig {

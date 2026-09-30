@@ -156,8 +156,8 @@ export function createCli(): Command {
     .command("auth")
     .description("Verify and select an existing browser session")
     .argument("<url>", "HTTPS manaba URL, e.g. https://mgu.manaba.jp")
-    .option("--browser <browser>", "chrome, edge, firefox or safari", "chrome")
-    .option("--profile <profile>", "Browser profile name or directory")
+    .option("--browser <browser>", "chrome, chromium, edge, firefox or safari", "chrome")
+    .option("--profile <profile>", "Browser profile name or path")
     .action(async (url: string) => {
       printJson(await authenticate(url, auth.optsWithGlobals<AuthOptions>()));
     });

@@ -16,6 +16,8 @@ bun add -g ripmanaba
 
 通常の Chrome などで manaba にログインした状態で、manaba の URL を指定します。
 CLI は専用ブラウザを起動せず、指定したブラウザの現在の Cookie を読み取ります。
+ブラウザのプロファイルと、Cookie の復号に必要な OS の鍵へ CLI からアクセスできる
+環境が必要です。
 
 ```sh
 ripmanaba auth https://example.manaba.jp/ct/home --browser chrome --profile protocol
@@ -25,6 +27,17 @@ ripmanaba auth https://example.manaba.jp/ct/home --browser chrome --profile prot
 は `chrome` です。`--profile` を省略すると、指定したブラウザの既定プロファイル
 を使います。複数のプロファイルを使っている場合は、ブラウザに表示されるプロ
 ファイル名を明示してください。Safari では `--profile` を指定できません。
+
+Chromium は macOS と Linux で `--browser chromium` を指定して使えます。
+Chrome と Chromium ではプロファイルの探索先と OS の鍵の選択が異なるため、
+実際にログインしているブラウザを選択してください。
+
+Chrome、Chromium、Edge の `--profile` には、表示名に加えてプロファイルディレクトリ
+または Cookie DB のパスを指定できます。非標準の保存先を使っている場合の例:
+
+```sh
+ripmanaba auth https://example.manaba.jp --browser chromium --profile /path/to/chromium/Default
+```
 
 初回の `auth` では `/ct/home` を取得し、ログアウト操作を示す画面マーカーがある
 ことを確認してから設定を保存します。保存先は既定では
@@ -37,6 +50,22 @@ Windows では Chrome の App-Bound Encryption により Cookie を読み取れ�
 あります。同じブラウザで再ログインしても解決しないことがあるため、利用できる別の
 対応ブラウザを `--browser` で選択してください。Cookie を端末へ貼り付ける方法は
 使いません。
+
+### Cookie DB が見つからない場合
+
+`cookies database not found` は、選択したブラウザの Cookie DB を検出できなかった
+ことを示します。この段階では、ブラウザでのログイン状態は確認できていません。
+
+`--browser` が実際のブラウザと一致することを確認し、ブラウザで `chrome://version`
+を開ける場合は「Profile Path」を `--profile` に指定してください。指定するのは
+`Default` などのプロファイルディレクトリであり、`--user-data-dir` に指定する
+ユーザーデータディレクトリではありません
+（[Chromium のプロファイルパス説明](https://chromium.googlesource.com/chromium/src/+/main/docs/user_data_dir.md)）。
+
+管理ブラウザで保存先を確認できない場合は、管理者や環境の提供元が案内する
+プロファイルパスと、CLI からそのパスへアクセスできるかを確認してください。
+CLI からアクセスできないブラウザのセッションは、この Cookie DB 読み取り方式では
+利用できません。
 
 ## Usage
 
@@ -113,7 +142,7 @@ ripmanaba submission open <submission-id>
 ## Requirements
 
 - Bun >= 1.3.13
-- Chrome、Edge、Firefox、または Safari
+- Chrome、Chromium（macOS / Linux）、Edge、Firefox、または Safari
 - ログイン済みの manaba ブラウザセッション
 
 ## Development

@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
 
-import { writeSessionConfig } from "../src/session.ts";
+import { readSessionConfig, writeSessionConfig } from "../src/session.ts";
 
 const execute = promisify(execFile);
 
@@ -55,6 +55,103 @@ test("nested command help requires no session and documents arguments", async ()
   assert.match(stdout, /<course-id>/);
   assert.equal(stderr, "");
 });
+
+test("auth help lists Chromium and profile paths", async () => {
+  const { stdout, stderr } = await execute(process.execPath, ["src/index.ts", "auth", "--help"]);
+
+  assert.match(stdout, /chrome, chromium, edge, firefox or safari/);
+  assert.match(stdout, /profile.*path/i);
+  assert.equal(stderr, "");
+});
+
+test("auth explains inaccessible profiles and preserves the saved configuration", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ripmanaba-auth-missing-"));
+  const path = join(directory, "config.json");
+  const config = {
+    browser: "chrome" as const,
+    origin: "https://mgu.manaba.jp",
+    version: 1 as const,
+  };
+  const browsers = ["chrome"];
+
+  if (process.platform === "darwin" || process.platform === "linux") {
+    browsers.push("chromium");
+  }
+
+  try {
+    await writeSessionConfig(config, path);
+
+    for (const browser of browsers) {
+      await assert.rejects(
+        execute(process.execPath, [
+          "src/index.ts",
+          "auth",
+          config.origin,
+          "--browser",
+          browser,
+          "--profile",
+          join(directory, "missing-profile"),
+          "--config",
+          path,
+        ]),
+        (error: unknown) => {
+          assert.ok(
+            error instanceof Error && "stderr" in error && "stdout" in error && "code" in error,
+          );
+
+          assert.equal(error.code, 1);
+          assert.equal(error.stdout, "");
+          assert.match(String(error.stderr), /No usable browser cookies/);
+          assert.match(String(error.stderr), /cookies database not found/);
+          assert.match(String(error.stderr), /--browser/);
+          assert.match(String(error.stderr), /--profile/);
+          assert.match(String(error.stderr), /accessible from this CLI/);
+          assert.doesNotMatch(String(error.stderr), /Log in|not authenticated/i);
+
+          return true;
+        },
+      );
+
+      assert.deepEqual(await readSessionConfig(path), config);
+    }
+  } finally {
+    await rm(directory, { recursive: true });
+  }
+});
+
+test.skipIf(process.platform === "darwin" || process.platform === "linux")(
+  "auth rejects Chromium extraction on unsupported platforms",
+  async () => {
+    const path = join(tmpdir(), `ripmanaba-chromium-unsupported-${randomUUID()}.json`);
+
+    await assert.rejects(
+      execute(process.execPath, [
+        "src/index.ts",
+        "auth",
+        "https://mgu.manaba.jp",
+        "--browser",
+        "chromium",
+        "--config",
+        path,
+      ]),
+      (error: unknown) => {
+        assert.ok(error instanceof Error && "stderr" in error && "stdout" in error);
+        assert.equal(error.stdout, "");
+
+        assert.match(
+          String(error.stderr),
+          /Chromium cookie extraction is supported on macOS and Linux only/,
+        );
+
+        assert.doesNotMatch(String(error.stderr), /No usable browser cookies|Keychain/);
+
+        return true;
+      },
+    );
+
+    assert.equal(await readSessionConfig(path), undefined);
+  },
+);
 
 test("global config option is honored before and after subcommands", async () => {
   const path = join(tmpdir(), `ripmanaba-missing-${randomUUID()}.json`);

@@ -197,16 +197,33 @@ export async function createManabaClient(
   options: BrowserCookieOptions = {},
 ): Promise<ManabaClient> {
   const origin = normalizeManabaOrigin(config.origin);
+
+  if (
+    config.browser === "chromium" &&
+    process.platform !== "darwin" &&
+    process.platform !== "linux"
+  ) {
+    throw new Error("Chromium cookie extraction is supported on macOS and Linux only.");
+  }
+
   const readCookies = options.readCookies ?? getCookies;
   const warn =
     options.warn ??
     ((message: string) => {
       console.error(`Warning: ${message}`);
     });
+  let browser = config.browser;
+  let chromiumBrowser: "chrome" | "chromium" = "chrome";
+
+  if (browser === "chromium") {
+    browser = "chrome";
+    chromiumBrowser = "chromium";
+  }
+
   const { cookies, warnings } = await readCookies({
-    browsers: [config.browser],
+    browsers: [browser],
     chromeProfile: config.profile,
-    chromiumBrowser: "chrome",
+    chromiumBrowser,
     edgeProfile: config.profile,
     firefoxProfile: config.profile,
     mode: "first",
@@ -216,7 +233,10 @@ export async function createManabaClient(
 
   if (cookies.length === 0) {
     throw new Error(
-      `No usable browser cookies. Log in to manaba in the selected browser. ${warnings.join(" ")}`,
+      [
+        "No usable browser cookies. Check --browser and --profile, and make sure the selected profile is accessible from this CLI.",
+        ...warnings,
+      ].join("\n"),
     );
   }
 

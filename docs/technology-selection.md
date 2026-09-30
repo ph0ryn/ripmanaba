@@ -58,18 +58,22 @@ See [CLIコマンド設計](./cli-command-design.md).
 - Cookie、復号鍵、storage state、専用ブラウザプロファイルは CLI に永続化しない。
 - Cookie 値は HTTP request のメモリ上だけで使い、標準出力やログへ出力しない。
 - `sweet-cookie` の警告は原因を失わずに扱う。Cookie が取得できない場合は
-  ブラウザで manaba にログインしてから再実行するよう案内する。
+  ブラウザと profile の選択、および CLI から profile にアクセスできるかを
+  確認するよう案内する。
 
 `sweet-cookie` は Chrome、Edge、Firefox、Safari に対応する。ただし Safari は
 プロファイル名を指定できない。既定の browser は `chrome` とし、profile を省略
 した場合は指定ブラウザの既定プロファイルを使う。
+Chromium は macOS と Linux で、Chrome backend に `chromiumBrowser: "chromium"`
+を指定して読み取る。これにより Chromium の探索先と OS の鍵を選択する。
 
-| browser   | 対応する profile         | 備考                                      |
-| --------- | ------------------------ | ----------------------------------------- |
-| `chrome`  | プロファイル名またはパス | 既定値。Chrome の既定プロファイルを使える |
-| `edge`    | プロファイル名またはパス | Edge の既定プロファイルを使える           |
-| `firefox` | プロファイル名またはパス | Firefox の Cookie DB を使う               |
-| `safari`  | 指定不可                 | macOS の Safari Cookie store を使う       |
+| browser    | 対応する profile         | 備考                                      |
+| ---------- | ------------------------ | ----------------------------------------- |
+| `chrome`   | プロファイル名またはパス | 既定値。Chrome の既定プロファイルを使える |
+| `chromium` | プロファイル名またはパス | macOS と Linux の Chromium を使う         |
+| `edge`     | プロファイル名またはパス | Edge の既定プロファイルを使える           |
+| `firefox`  | プロファイル名またはパス | Firefox の Cookie DB を使う               |
+| `safari`   | 指定不可                 | macOS の Safari Cookie store を使う       |
 
 ### manaba URL と設定
 
@@ -90,7 +94,7 @@ See [CLIコマンド設計](./cli-command-design.md).
 type Config = {
   version: number;
   origin: string;
-  browser: "chrome" | "edge" | "firefox" | "safari";
+  browser: "chrome" | "chromium" | "edge" | "firefox" | "safari";
   profile?: string;
 };
 ```

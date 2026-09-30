@@ -19,10 +19,11 @@
 ## 認証コマンド
 
 ```sh
-ripmanaba auth <url> [--browser chrome|edge|firefox|safari] [--profile <profile>]
+ripmanaba auth <url> [--browser chrome|chromium|edge|firefox|safari] [--profile <profile>]
 ```
 
 - `--browser` の既定値は `chrome`。
+- `chromium` の Cookie 読み取りは macOS と Linux に対応する。
 - `--profile` を省略した場合は指定ブラウザの既定profileを使う。
 - `safari` では `--profile` を指定できない。
 - `<url>` は `https://*.manaba.jp` のHTTPS URLに限る。
