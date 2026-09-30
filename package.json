@@ -1,6 +1,6 @@
 {
   "name": "ripmanaba",
-  "version": "0.2.1",
+  "version": "1.0.0",
   "description": "CLI for accessing the manaba learning management service.",
   "license": "MIT",
   "author": "ph0ryn",
