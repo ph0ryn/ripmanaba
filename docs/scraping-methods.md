@@ -7,18 +7,30 @@
 
 このメモは `chrome-devtools-mcp` で確認したDOMとpathをもとにする。PoC実装
 は作らず、このメモを初期実装のスクレイピング仕様として扱う。実装では、
-`ripmanaba auth` で保存した認証済みoriginに、このメモのpathを結合してアク
-セスする。
+`ripmanaba auth <url>` で保存したoriginに、このメモのpathを結合してアクセス
+する。
 
 ## 共通方針
 
-originはユーザーのmanaba環境ごとに異なるため保存済みoriginを使う。JSONへ返
-すリンクは、保存済みoriginを含めた絶対URLとして `url` に入れる。originを除
-いたpathはID抽出とURL算出の内部表現としてだけ使い、返却JSONには含めない。
+originはユーザーのmanaba環境ごとに異なるため、設定に保存したoriginを使う。
+JSONへ返すリンクは、保存済みoriginを含めた絶対URLとして `url` に入れる。origin
+を除いたpathはID抽出とURL算出の内部表現としてだけ使い、返却JSONには含めない。
+
+HTTP requestを作る前に、毎回 `@steipete/sweet-cookie@0.4.4` から設定済みブラウザ
+の現在のCookieを取得する。Cookieは対象URLに限定し、CLIのファイルやログには保存
+しない。Cookieの再取得retryは行わない。
+
+入力URLはHTTPSかつ `*.manaba.jp` のhostに限る。HTTP responseがログイン画面へ
+redirectされた場合はCookieを別のhostへ転送せず、fail fastでブラウザからmanabaへ
+ログインするよう案内する。macOSではKeychainの許可を求められる可能性があり、
+WindowsではChromeのApp-Bound Encryptionで復号できないCookieがあり得る。
+
+各一覧は入口画面の1ページだけを取得する。必須tableやリンクがない場合はHTML欠損
+エラーとし、tableが存在して行がない場合の空一覧とは区別する。
 
 ```ts
 const path = new URL(anchor.href).pathname + new URL(anchor.href).search;
-const url = new URL(path, savedOrigin).toString();
+const url = new URL(path, config.origin).toString();
 ```
 
 実DOMの `href` 属性は `course_2766689` や `page_2940479c2766689` のような
@@ -27,15 +39,20 @@ const url = new URL(path, savedOrigin).toString();
 
 IDは原則としてpathから抽出する。
 
-| resource     | path pattern                              | id             |
-| ------------ | ----------------------------------------- | -------------- |
-| course       | `/ct/course_<course-id>`                  | `<course-id>`  |
-| report task  | `/ct/course_<course-id>_report_<task-id>` | `<task-id>`    |
-| quiz task    | `/ct/course_<course-id>_query_<task-id>`  | `<task-id>`    |
-| survey task  | `/ct/course_<course-id>_survey_<task-id>` | `<task-id>`    |
-| content      | `/ct/page_<content-id>`                   | `<content-id>` |
-| content page | `/ct/page_<content-id>_<page-id>`         | `<page-id>`    |
-| notice       | `/ct/home_campusnews_<notice-id>`         | `<notice-id>`  |
+content IDは安全なASCII英数字またはハイフンを各部分に使い、アンダースコアを最大
+1個まで許可する。`^[A-Za-z0-9-]+(?:_[A-Za-z0-9-]+)?$` に一致する値だけを受け付
+け、数字と `c` の組み合わせには限定しない。rootのcontent IDは `<content-id>`、
+ページのcontent IDは `<content-id>_<page-id>` とし、bareな `<page-id>` は返さない。
+
+| resource     | path pattern                              | id                             |
+| ------------ | ----------------------------------------- | ------------------------------ |
+| course       | `/ct/course_<course-id>`                  | `<course-id>`                  |
+| report task  | `/ct/course_<course-id>_report_<task-id>` | `<course-id>_report_<task-id>` |
+| quiz task    | `/ct/course_<course-id>_query_<task-id>`  | `<course-id>_query_<task-id>`  |
+| survey task  | `/ct/course_<course-id>_survey_<task-id>` | `<course-id>_survey_<task-id>` |
+| content      | `/ct/page_<content-id>`                   | `<content-id>`                 |
+| content page | `/ct/page_<content-id>_<page-id>`         | `<content-id>_<page-id>`       |
+| notice       | `/ct/home_campusnews_<notice-id>`         | `<notice-id>`                  |
 
 `kind` はpath内のresource segmentから正規化する。
 
@@ -46,7 +63,7 @@ IDは原則としてpathから抽出する。
 | `_survey_`   | `survey`  |
 | `_project_`  | `project` |
 
-## course ls
+## course list
 
 入口path:
 
@@ -75,7 +92,7 @@ IDは原則としてpathから抽出する。
 `/ct/home_favoritecourse_<course-id>_set___` または画像altから推定できる。
 ただし初期実装では任意項目に留める。
 
-## new
+## updates
 
 入口path:
 
@@ -134,7 +151,7 @@ const items = [...roots]
 アイコン状態はHTML内に描画済みだった。現時点では追加のXHRやfetchを前提に
 しない。
 
-## task ls
+## task list
 
 入口path:
 
@@ -165,9 +182,10 @@ const items = [...roots]
 
 タイプ列のリンクは `/ct/course_<course-id>_report` のような一覧pathで、タ
 イトル列のリンクは `/ct/course_<course-id>_report_<task-id>` のような詳細
-pathになる。JSONの `url` には詳細URLを使う。
+pathになる。JSONの `id` は `course-id`、種別、課題IDを結合した
+`<course-id>_<report|query|survey>_<task-id>` とし、`url` には詳細URLを使う。
 
-## course info
+## course show
 
 詳細path:
 
@@ -199,7 +217,7 @@ pathになる。JSONの `url` には詳細URLを使う。
 新日時を読む。リンクは相対 `page_<content-id>` で入る場合があるため、正規
 化後のpathで `/ct/page_` を判定する。
 
-## task info
+## task show
 
 詳細path:
 
@@ -209,19 +227,19 @@ pathになる。JSONの `url` には詳細URLを使う。
 /ct/course_<course-id>_survey_<task-id>
 ```
 
-CLIには `<task-id>` だけが渡るため、実装では先に `task ls` と同じ
-`/ct/home_library_query` を読み、該当IDの詳細URLを解決してから詳細pathを取
-得する。未提出課題一覧に存在しないIDは `task info` と `task open` の対象外
-として扱う。
+CLIには `<course-id>_<report|query|survey>_<task-id>` 形式の複合IDが渡るため、
+`task show` と `task open` は未提出課題一覧を先に取得せず、IDから詳細pathを直接
+組み立てる。提出済みまたは一覧にない課題も、manabaの閲覧権限と認証範囲に含まれ
+ていれば対象にする。
 
-共通のコース概要は `course info` と同じ `.pageheader-course` から取る。
+共通のコース概要は `course show` と同じ `.pageheader-course` から取る。
 課題詳細本体は種別ごとに主要tableが異なる。
 
-| kind     | selector                                       |
-| -------- | ---------------------------------------------- |
-| `report` | `table.stdlist-report`                         |
-| `quiz`   | `table.stdlist-query`                          |
-| `survey` | 未確認。`table.stdlist-query` 相当を候補にする |
+| kind     | selector                                                                   |
+| -------- | -------------------------------------------------------------------------- |
+| `report` | `table.stdlist-report`                                                     |
+| `quiz`   | `table.stdlist-query`                                                      |
+| `survey` | `table.stdlist-query`（query系DOM解析を継続。現物のsurvey詳細DOMは未確認） |
 
 tableは1行目がタイトル、以降が見出しセルと値セルの組になっている。見出し
 テキストでフィールドへ対応させる。
@@ -252,7 +270,7 @@ tableは1行目がタイトル、以降が見出しセルと値セルの組に�
 添付ファイルは `添付ファイル` 行のリンクを読む。リンクpathが `/ct/` 配下で
 あれば保存済みoriginで絶対URL化し、外部URLならそのまま保持する。
 
-## content ls
+## content list
 
 入口path:
 
@@ -271,9 +289,10 @@ tableは1行目がタイトル、以降が見出しセルと値セルの組に�
 | `pageCount` | `全 7 ページ` の数値         |
 | `updatedAt` | ページ数表示と同じセルの日時 |
 
-タイトルリンクは `/ct/page_<content-id>` になる。
+タイトルリンクは `/ct/page_<content-id>` になる。返却するrootの `id` は
+`<content-id>` であり、そのまま `content show/open` に渡せる。
 
-## content info
+## content show
 
 詳細path:
 
@@ -282,20 +301,25 @@ tableは1行目がタイトル、以降が見出しセルと値セルの組に�
 /ct/page_<content-id>_<page-id>
 ```
 
+CLIの引数が `<content-id>_<page-id>` の場合はページを指定した詳細pathとして扱う。
+`<content-id>` だけの場合はコンテンツ全体を取得する。`content open` も同じ引数
+規則とURL算出を使う。ページ指定時の返却JSONのトップレベル `id` は複合IDにする。
+
 コンテンツ詳細では、コース概要は `.pageheader-course`、ページセット概要は
 本文上部、ページ一覧は `table.stdlist.contentspagelist` から読む。
 
-| JSON field                        | source                                          |
-| --------------------------------- | ----------------------------------------------- |
-| `id`                              | current path の `<content-id>`                  |
-| `url`                             | current URL                                     |
-| `title`                           | ページセットタイトル                            |
-| `course`                          | `.pageheader-course`                            |
-| `publishedFrom`, `publishedUntil` | `公開期間：...～...`                            |
-| `updatedAt`                       | `更新日時 : ...`                                |
-| `pages`                           | `table.stdlist.contentspagelist` のページリンク |
+| JSON field                        | source                                                         |
+| --------------------------------- | -------------------------------------------------------------- |
+| `id`                              | rootは `<content-id>`、ページ指定時は `<content-id>_<page-id>` |
+| `url`                             | current URL                                                    |
+| `title`                           | ページセットタイトル                                           |
+| `course`                          | `.pageheader-course`                                           |
+| `publishedFrom`, `publishedUntil` | `公開期間：...～...`                                           |
+| `updatedAt`                       | `更新日時 : ...`                                               |
+| `pages`                           | `table.stdlist.contentspagelist` のページリンク                |
 
 current pageは、本文中の現在表示ページ見出しと添付ファイルリンクから取る。
+`currentPage.id` と `pages[].id` はどちらも `<content-id>_<page-id>` の複合IDにする。
 添付ファイルリンクは次の形式になる。
 
 ```text
@@ -312,7 +336,7 @@ current pageは、本文中の現在表示ページ見出しと添付ファイ�
 ト実装で、添付UIや `window.AttachmentFile`、ページ編集用scriptと混在する
 ため、安定したテキスト抽出対象として扱わない。
 
-## notice ls
+## notice list
 
 入口path:
 
@@ -333,7 +357,7 @@ current pageは、本文中の現在表示ページ見出しと添付ファイ�
 
 詳細リンクは `/ct/home_campusnews_<notice-id>` になる。
 
-## notice info
+## notice show
 
 詳細path:
 
@@ -353,10 +377,10 @@ current pageは、本文中の現在表示ページ見出しと添付ファイ�
 | `updatedAt`   | `最終更新` の日時        |
 
 本文中の外部リンクは `/ct/link_iframe_balloon?url=...` に包まれる場合があ
-る。`notice info` の型にはリンク配列がないため、本文テキストとして保持す
+る。`notice show` の型にはリンク配列がないため、本文テキストとして保持す
 る。
 
-## submission ls
+## submission list
 
 入口path:
 
@@ -396,12 +420,13 @@ current pageは、本文中の現在表示ページ見出しと添付ファイ�
 2766977-query-2935448-2026-04-12-01-56
 ```
 
-## submission info
+## submission show
 
-`submission info` は提出記録一覧の1行を正規化したものとして扱う。元課題詳
+`submission show` は提出記録一覧の1行を正規化したものとして扱う。実行時に取得
+する現在の1ページにある提出IDだけを対象にし、ページ送りで検索しない。元課題詳
 細ページは追加で開かない。
 
-そのため取得元は `submission ls` と同じ `table.edit` の行でよい。
+そのため取得元は `submission list` と同じ `table.edit` の行でよい。
 
 `detailText` は現時点で提出記録一覧に追加本文がないため、基本は未設定にす
 る。将来、行内に詳細表示や別パネルが確認できた場合のみ追加する。
@@ -410,5 +435,11 @@ current pageは、本文中の現在表示ページ見出しと添付ファイ�
 
 - `survey` 詳細画面の実DOM。
 - 添付ファイルが複数ある課題詳細のDOM。
-- `course ls` のお気に入りON状態の確定selector。
+- `course list` のお気に入りON状態の確定selector。
 - 提出記録のページ送り時に、日付引き継ぎがページ境界をまたぐかどうか。
+
+## 検証境界
+
+認証とHTML解析の自動テストは、実ブラウザや実Cookieを使わず、合成Cookie、合成
+設定、合成HTML fixtureで行う。Keychainの鍵、実プロファイル、復号済みCookieを
+fixtureやログへ含めない。

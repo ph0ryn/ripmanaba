@@ -13,12 +13,12 @@ manabaの各画面にどのような情報が表示されているかを整理�
 
 manabaのURLは大学や組織ごとにdomainが異なる。
 
-そのため、ripmanabaではmanabaのdomainをハードコードしない。`ripmanaba
-auth`でユーザーが開いたmanabaページを起点に、認証済みのoriginを記録して
-後続コマンドで使う。
+そのため、ripmanabaではmanabaのdomainをハードコードしない。`ripmanaba auth
+<url>` に渡されたURLからoriginを取り出し、設定に記録して後続コマンドで使う。
+入力URLはHTTPSかつ `*.manaba.jp` のhostに限る。
 
-pathはmanaba側で共通とみなして調査する。実装では、記録したoriginと共通
-pathを組み合わせて画面へ遷移する。
+pathはmanaba側で共通とみなして調査する。実装では、設定に記録したoriginと共通
+pathを組み合わせて画面を取得する。
 
 確認したURL構造:
 
@@ -40,6 +40,28 @@ https://<manaba-domain>/ct/<path>
 | レポート詳細   | `/ct/course_<course-id>_report_<report-id>` |
 | 小テスト一覧   | `/ct/course_<course-id>_query`              |
 | 小テスト詳細   | `/ct/course_<course-id>_query_<query-id>`   |
+
+## 認証済みブラウザセッション
+
+`auth <url>` は専用ブラウザを起動しない。設定に記録した `browser` と任意の
+`profile` に対応するブラウザの現在のCookieを `@steipete/sweet-cookie@0.4.4` で読み取り、指定URL
+の `/ct/home` を取得する。取得したホーム画面にログアウト操作を示すmarkerがなけ
+れば、ログイン済みとは判定しない。
+
+保存先は `$XDG_CONFIG_HOME/ripmanaba/config.json`（未設定時は
+`~/.config/ripmanaba/config.json`）で、`version`、`origin`、`browser`、任意の
+`profile` だけをmode `600`でatomicに保存する。Cookie、Keychainの鍵、専用ブラウザ
+プロファイル、storage stateは保存しない。
+
+通常コマンドは実行ごとに同じブラウザから現在のCookieを読み取る。ログイン画面へ
+リダイレクトされた場合はCookieを転送せず、再取得も行わずにブラウザでmanabaへ
+ログインするよう案内して終了する。macOSではKeychainの許可を求められる可能性が
+あり、WindowsではChromeのApp-Bound Encryptionにより一部のCookieを復号できない
+場合がある。同じブラウザで再ログインしても解決しないことがあるため、利用できる
+別の対応ブラウザを `--browser` で選択する。
+
+一覧画面は取得した1ページだけを対象にする。必須のtableやリンクが欠損している
+場合は画面の欠損として扱い、正しい画面に行がない空一覧とは区別する。
 
 ## 共通で表示される情報
 
@@ -207,6 +229,8 @@ manaba
 
 曜日表示では、曜日と時限ごとにコースが配置される。
 
+ホーム画面のコース別未読・未処理状態は `ripmanaba updates` で取得する。
+
 ## お知らせ
 
 ホーム画面には組織からのお知らせが表示される。
@@ -219,8 +243,8 @@ manaba
 
 ホーム画面の全体お知らせとしてCLI対象にする。
 
-- `ripmanaba notice ls`
-- `ripmanaba notice info <notice-id>`
+- `ripmanaba notice list`
+- `ripmanaba notice show <notice-id>`
 - `ripmanaba notice open <notice-id>`
 
 ## コース一覧画面
@@ -238,7 +262,7 @@ manaba
 
 ホーム画面と同様に、サムネイル、リスト、曜日の表示形式がある。
 
-`ripmanaba course ls`では、まずこの画面の情報が候補になる。
+`ripmanaba course list`では、まずこの画面の情報が候補になる。
 
 ## コース詳細画面
 
@@ -272,14 +296,16 @@ manaba
 - 個別指導
 - ピアレビュー
 
-`ripmanaba course info [course ID]`では、この画面のコース概要とメニュー
+`ripmanaba course show [course ID]`では、この画面のコース概要とメニュー
 状態が候補になる。
 
 コースコンテンツは、深いコマンド階層にはせず `content` resourceとして扱う。
 
-- `ripmanaba content ls [course-id]`
-- `ripmanaba content info <content-id>`
+- `ripmanaba content list <course-id>`
+- `ripmanaba content show <content-id>`
+- `ripmanaba content show <content-id>_<page-id>`
 - `ripmanaba content open <content-id>`
+- `ripmanaba content open <content-id>_<page-id>`
 
 ## 未提出課題一覧画面
 
@@ -301,7 +327,12 @@ manaba
 
 各行には、課題タイプ、課題タイトル、コースへのリンクがある。
 
-`ripmanaba task ls`では、まずこの画面の情報が候補になる。
+`ripmanaba task list`では、まずこの画面の情報が候補になる。
+
+`task list`はこの画面の一覧を取得する。一方、`task show` と `task open` は
+`<course-id>_<report|query|survey>_<task-id>` 形式の複合IDから詳細pathを直接組み
+立てるため、未提出課題一覧には依存しない。提出済みや一覧にない課題も、manabaの
+閲覧権限と認証範囲に含まれていれば対象にする。
 
 ## 課題詳細画面
 
@@ -320,7 +351,10 @@ manaba
 - アップロード操作
 - 課題一覧へ戻る導線
 
-`ripmanaba task info [task ID]`では、この画面の情報が候補になる。
+`ripmanaba task show [task ID]`では、この画面の情報を取得する。課題IDにはコース
+ID、種別、課題IDを含め、例えば `2766776_report_3008513` と表す。アンケートの
+詳細画面はquery系DOM解析で扱う。現物のsurvey詳細DOMはまだ確認していないため、
+差異が見つかった場合は実DOMに合わせてselectorを更新する。
 
 ## 提出記録画面
 
@@ -352,9 +386,12 @@ manaba
 
 提出済み課題や履歴系の `submission` resourceとして扱う。
 
-- `ripmanaba submission ls`
-- `ripmanaba submission info <submission-id>`
+- `ripmanaba submission list`
+- `ripmanaba submission show <submission-id>`
 - `ripmanaba submission open <submission-id>`
+
+`submission show` と `submission open` は、実行時に取得する提出記録一覧の現在の
+1ページにあるIDだけを対象にする。ページ送りで別ページを検索しない。
 
 ## ポートフォリオ画面
 
@@ -372,13 +409,12 @@ manaba
 
 READMEの最低要件には入っていないが、将来的な対象候補として画面が存在する。
 
-## 次に調べること
+## 取得時の判定
 
-次の調査では、画面上の情報をどのように安定して取得できるかを確認する。
+一覧の取得は常に現在表示されている1ページだけで完結させる。対象tableが存在し
+ていて行が0件の場合は空一覧として `[]` を返す。必須table、見出し、または行に
+必要なリンクがない場合はHTML欠損としてエラーにする。
 
-- 各画面のDOM構造
-- 安定して使えるselector
-- 課題タイプごとの詳細画面差分
-- コース一覧の表示形式ごとの差分
-- 直接HTTPで取得できる画面とPlaywrightが必要な画面の切り分け
-- `open`系コマンドで開くべきURLの扱い
+`open` は `show` と同じURL算出ロジックを使い、既定ブラウザを起動できない場合や
+起動直後（1秒以内）に失敗した場合はエラーにする。長く動く起動プロセスの終了は
+待たない。

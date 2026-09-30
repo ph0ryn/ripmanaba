@@ -3,160 +3,131 @@
 ## 方針
 
 コマンドは、manabaの画面階層ではなくユーザーが扱いたいresourceを基準にす
-る。
+る。コース内のコンテンツも `content` をtop-level resourceとして扱い、深い
+コマンド列にはしない。
 
-例えば、コース内のコンテンツを開く場合でも
-`ripmanaba course content open <id>` のように深い階層にはしない。`content`
-をtop-level resourceとして扱う。
+各resourceは次の操作を持つ。
 
-各resourceは原則として同じoperationを持つ。
+- `list`: 一覧をJSONで表示する
+- `show <id>`: 詳細をJSONで表示する
+- `open <id>`: `show <id>` と同じURL算出でmanaba画面を既定ブラウザで開く
 
-- `ls`: 一覧を表示する
-- `info <id>`: 詳細をJSONで表示する
-- `open <id>`: `info <id>` が返す `url` と同じ算出でmanaba画面をブラウザで
-  開く
+すべてのコマンドは共通optionとして `--config <path>` を受け付ける。設定を
+省略した場合の既定pathは `$XDG_CONFIG_HOME/ripmanaba/config.json`（未設定時は
+`~/.config/ripmanaba/config.json`）である。
 
-複数形と単数形の違いでoperationを表現しない。
-
-## 初期コマンド
-
-READMEに記載する最低要件。
+## 認証コマンド
 
 ```sh
-ripmanaba course ls
-ripmanaba course info <course-id>
+ripmanaba auth <url> [--browser chrome|edge|firefox|safari] [--profile <profile>]
+```
+
+- `--browser` の既定値は `chrome`。
+- `--profile` を省略した場合は指定ブラウザの既定profileを使う。
+- `safari` では `--profile` を指定できない。
+- `<url>` は `https://*.manaba.jp` のHTTPS URLに限る。
+- 専用ブラウザや専用profileは起動しない。指定したブラウザの現在のCookieを読み、
+  `/ct/home` とログアウトmarkerを検証する。
+- 検証に成功した場合だけ、`version`、`origin`、`browser`、任意の`profile`を
+  mode `600`の設定ファイルへatomicに保存する。Cookie、Keychainの鍵、storage
+  stateは保存しない。
+
+通常のresource commandも実行時に現在のブラウザCookieを読み取る。ログイン画面へ
+redirectされた場合はCookieを転送せず、再取得retryも行わずにブラウザでのログインを
+案内してfail fastする。
+
+## コマンド一覧
+
+```sh
+ripmanaba updates
+
+ripmanaba course list
+ripmanaba course show <course-id>
 ripmanaba course open <course-id>
 
-ripmanaba task ls
-ripmanaba task info <task-id>
-ripmanaba task open <task-id>
+ripmanaba task list
+ripmanaba task show <course-id>_<report|query|survey>_<task-id>
+ripmanaba task open <course-id>_<report|query|survey>_<task-id>
+
+ripmanaba content list <course-id>
+ripmanaba content show <content-id>
+ripmanaba content show <content-id>_<page-id>
+ripmanaba content open <content-id>
+ripmanaba content open <content-id>_<page-id>
+
+ripmanaba notice list
+ripmanaba notice show <notice-id>
+ripmanaba notice open <notice-id>
+
+ripmanaba submission list
+ripmanaba submission show <submission-id>
+ripmanaba submission open <submission-id>
 ```
 
-`course` には `crs` aliasを用意する。
+`updates` は `/ct/home` のコース別未読・未処理ステータスを返すresource外のコマンド
+である。
 
-```sh
-ripmanaba crs ls
-ripmanaba crs info <course-id>
-ripmanaba crs open <course-id>
-```
+## Resourceごとの規則
 
-## 追加コマンド
+| resource     | 操作                                     | 引数と意味                                           |
+| ------------ | ---------------------------------------- | ---------------------------------------------------- |
+| `course`     | `list`                                   | コース一覧を取得する                                 |
+| `course`     | `show/open <course-id>`                  | コースIDから詳細画面を取得または開く                 |
+| `task`       | `list`                                   | `/ct/home_library_query` の課題一覧1ページを取得する |
+| `task`       | `show/open <course-id>_<type>_<task-id>` | IDから詳細URLを直接組み立てる                        |
+| `content`    | `list <course-id>`                       | 指定コースのコンテンツ一覧1ページを取得する          |
+| `content`    | `show/open <content-id>[_<page-id>]`     | コンテンツまたはページを取得または開く               |
+| `notice`     | `list`                                   | ホームのお知らせ一覧を取得する                       |
+| `notice`     | `show/open <notice-id>`                  | お知らせ詳細を取得または開く                         |
+| `submission` | `list`                                   | 提出記録一覧の現在表示されている1ページを取得する    |
+| `submission` | `show/open <submission-id>`              | 現在の提出記録一覧にあるIDを取得または開く           |
 
-```sh
-ripmanaba <resource> <operation> [id]
-```
+`content list` はコース内の一覧であるため、`<course-id>` を必須にする。一覧と詳細
+が返すcontent IDは、そのまま `content show` または `content open` に渡せる。
+コンテンツ全体は `<content-id>`、ページは `<content-id>_<page-id>` として扱う。
+content IDは安全なASCII英数字またはハイフンを各部分に使い、アンダースコアは最大
+1個まで許可する。入力全体は `^[A-Za-z0-9-]+(?:_[A-Za-z0-9-]+)?$` に一致させる。
 
-追加resource:
+課題IDの `<type>` は `report`、`query`、`survey` のいずれかで、例えば
+`2766776_report_3008513` のように表す。`task show` と `task open` は現在の未提出
+課題一覧からIDを解決せず、複合IDから詳細pathを直接算出する。提出済みまたは一覧に
+ない課題も、manabaの閲覧権限と認証範囲で閲覧できる限り対象にする。アンケートの
+詳細画面はquery系DOM解析で扱う。現物のsurvey詳細DOMはまだ確認していないため、
+実DOMとの相違はfixtureとselectorの更新で吸収する。
 
-- `content`
-- `notice`
-- `submission`
+`submission show` と `submission open` は、実行時に取得した提出記録一覧の現在の
+1ページに存在する提出IDだけを対象にする。ページをまたいだ検索や追加取得は行わな
+い。
 
-追加operation:
+各 `list` は入口画面の1ページだけを対象にする。行が0件なら空配列を返し、必須の
+table、見出し、または行に必要なリンクが欠損している場合は解析エラーにする。
 
-- `new`: ホーム画面のコース一覧に出る未読・未処理ステータスを返す
-
-## Resource一覧
-
-実装予定なしのものも含め、manaba側の意味的なresourceとCLI上の扱いを整理す
-る。
-
-| resource         | CLI名           | 状態     | 備考                                      |
-| ---------------- | --------------- | -------- | ----------------------------------------- |
-| コース           | `course`        | 初期実装 | `crs` aliasを用意する                     |
-| 未提出課題       | `task`          | 初期実装 | 複数コース横断の課題配列として扱う        |
-| コースコンテンツ | `content`       | 実装済み | `course content` にはしない               |
-| 全体お知らせ     | `notice`        | 実装済み | コースニュースとは別resource              |
-| 提出記録         | `submission`    | 実装済み | 複数コース横断の提出配列として扱う        |
-| 未読・未処理     | `new`           | 追加候補 | homeのコース赤アイコンを横断配列にする    |
-| コースニュース   | 未定            | 追加候補 | `notice` に含めるか別resourceにするか未定 |
-| 小テスト         | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
-| アンケート       | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
-| レポート         | `task` に含める | 初期実装 | 未提出課題では課題種別として扱う          |
-| 成績             | 未定            | 追加候補 | 個人情報性が高いため後で判断する          |
-| シラバス         | なし            | 後回し   | コース配下には存在するが初期対象外        |
-| プロジェクト     | `task` に含める | 後回し   | 横断一覧には出るが機能単体は後回し        |
-| 掲示板           | なし            | 後回し   | スレッドを含む                            |
-| グループニュース | なし            | 後回し   | 初期対象外                                |
-| 個別指導         | なし            | 後回し   | 初期対象外                                |
-| ピアレビュー     | なし            | 後回し   | 初期対象外                                |
-| ユーザー         | なし            | 対象外   | CLI対象にしない                           |
-| ポートフォリオ   | なし            | 対象外   | CLI対象にしない                           |
-
-## コマンドツリー
-
-初期実装と追加resourceまで含めたCLI構造。
-
-```text
-ripmanaba
-├── auth
-├── new
-├── <resource>
-│   └── <operation> [id]
-└── <alias>
-    └── <operation> [id]
-```
-
-初期resource:
-
-- `course`
-- `task`
-
-追加resource:
-
-- `content`
-- `notice`
-- `submission`
-
-alias:
-
-- `crs`: `course`
-
-operation:
-
-- `ls`
-- `info <id>`
-- `open <id>`
-
-`ls` と `info` が返すJSONには、各resourceの情報源となるmanaba画面の絶対URL
-を `url` として必ず含める。originを除いた `path` は返却JSONに含めない。
-`open` は `info` の `url` を保存して使うのではなく、同じURL算出ロジックで
-対象画面を開く。
-
-`content ls` はコース内のコンテンツ一覧を対象にするため、`id` に
-`course-id` を渡す。
-
-`ripmanaba new` はresource配下のoperationではなく、homeに出るコース別の未
-読・未処理ステータスを横断して返すショートカットとして扱う。対象は
-`/ct/home` のコース一覧に表示される赤アイコンで、初期実装ではコースニュー
-スと未提出課題を主対象にする。
+`list` と `show` が返すJSONには、情報源となるmanaba画面の絶対URLを `url` として
+含める。originを除いた `path` は返却JSONに含めない。`open` は同じURL算出ロジック
+で既定ブラウザを起動し、起動できない場合や起動直後（1秒以内）の失敗を検出して
+エラーを返す。長く動く起動プロセスの終了は待たない。
 
 ## Resourceごとの情報源
 
 | resource     | 主な画面                     | 主なpath                                                            |
 | ------------ | ---------------------------- | ------------------------------------------------------------------- |
 | `course`     | コース一覧、コース詳細       | `/ct/home_course`, `/ct/course_<course-id>`                         |
-| `task`       | 未提出課題一覧、課題詳細     | `/ct/home_library_query`, `/ct/course_<course-id>_<type>_<task-id>` |
+| `task`       | 課題一覧、課題詳細           | `/ct/home_library_query`, `/ct/course_<course-id>_<type>_<task-id>` |
 | `content`    | コース詳細、コースコンテンツ | `/ct/course_<course-id>_page`, `/ct/page_<content-id>`              |
 | `notice`     | ホーム、お知らせ詳細         | `/ct/home`, `/ct/home_campusnews_<notice-id>`                       |
 | `submission` | 提出記録                     | `/ct/home_submitlog`                                                |
-| `new`        | ホーム                       | `/ct/home`                                                          |
+| `updates`    | ホーム                       | `/ct/home`                                                          |
 
 ## IDの扱い
 
-ユーザーに渡すIDは、manabaのURL pathから抽出できるIDを基本にする。
+ユーザーに渡すIDは、manabaのURL pathから抽出できる値を基本にする。
 
-例:
+- `course_<course-id>` から `course-id` を取得する。
+- `course_<course-id>_<type>_<task-id>` を課題ID
+  `<course-id>_<type>_<task-id>` として扱う。
+- `page_<content-id>` から `<content-id>` を取得する。
+- `page_<content-id>_<page-id>` は `<content-id>_<page-id>` というページ指定の
+  content IDとして扱う。
 
-- `course_<course-id>` から `course-id` を取得する
-- `course_<course-id>_report_<report-id>` から `report-id` を取得する
-- `course_<course-id>_query_<query-id>` から `query-id` を取得する
-
-ただし、resourceごとにIDが衝突する可能性があるため、内部的にはresource
-typeとIDを組み合わせて扱う。
-
-## 未決事項
-
-- `task` にレポート、小テスト、アンケートなどをまとめるか
-- `submission` の短いaliasを用意するか
-- `content` や `notice` を初期実装に含めるか
+resourceごとのIDを混同しないよう、taskの種別は複合IDに含める。URLは保存した値を
+再利用せず、設定されたoriginとIDから毎回算出する。
