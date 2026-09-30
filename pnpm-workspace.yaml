@@ -2,26 +2,34 @@ packages:
   - .
 
 catalog:
-  '@steipete/sweet-cookie': 0.4.4
-  '@stylistic/eslint-plugin': ^5.10.0
-  '@types/bun': ^1.4.2
-  '@typescript/native-preview': 7.0.0-dev.20260430.1
+  "@steipete/sweet-cookie": 0.4.4
+  "@stylistic/eslint-plugin": ^5.10.0
+  "@types/bun": ^1.4.2
   cheerio: ^1.2.0
   commander: 15.0.0
-  eslint: ^10.3.0
-  eslint-plugin-oxlint: ^1.62.0
-  lint-staged: ^16.4.0
-  oxfmt: ^0.51.0
-  oxlint: ^1.62.0
-  oxlint-tsgolint: ^0.23.0
-  sort-package-json: ^3.6.1
   typescript: ^6.0.3
-  typescript-eslint: ^8.59.1
+  vite: npm:@voidzero-dev/vite-plus-core@1.0.0
+  vite-plus: 1.0.0
+  vitest: 5.0.1
 
 catalogMode: strict
 
 enablePrePostScripts: true
 
 minimumReleaseAge: 2880
+
+minimumReleaseAgeExclude:
+  - vite-plus@1.0.0
+  - "@voidzero-dev/*"
+
+overrides:
+  vite@*: "catalog:"
+  vitest@*: "catalog:"
+
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: "*"
 
 shellEmulator: true

@@ -118,8 +118,22 @@ ripmanaba submission open <submission-id>
 
 ## Development
 
+開発には [Vite+](https://viteplus.dev/guide/) 1.0.0 以降を使います。
+ツールの設定は `vite.config.ts`、依存バージョンは `pnpm-workspace.yaml` に集約
+しています。Node.js は `^22.22.1 || ^24.11.0 || >=26.0.0` に対応します。
+
 ```sh
-pnpm install --frozen-lockfile
-pnpm dev --help
-pnpm check
+vp install --frozen-lockfile
+vp run setup
+vp run dev -- --help
+vp check
+vp run test
+```
+
+`vp check` はフォーマット・lint・型チェックを行い、`vp check --fix` で修正できます。
+`vp run verify` はこれらと全テストをまとめて実行します。テストとCLIは Bun で
+実行するため、`vp run test` と `vp run dev` を使います。コマンドの例:
+
+```sh
+vp run dev course list
 ```

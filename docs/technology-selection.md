@@ -13,7 +13,11 @@ rendering 依存が見つかった場合だけ、目的を絞った調査を追�
 
 - 対象ランタイムは Bun とする。
 - 実装言語は TypeScript のままにする。
-- 既存の pnpm ベースの開発環境は維持する。
+- 開発ツールは `ph0ryn/ts-base` と同じ `vite-plus@1.0.0` に集約する。
+- `vp install` から pnpm を使用し、依存バージョンは pnpm catalog で管理する。
+- formatter、lint、型チェック、staged checks は `vite.config.ts` で設定する。
+- 命名チェックはテンプレートの `id-match` を使用し、変数・関数の宣言を対象にする。
+- テストと CLI は Bun のまま `vp run test`、`vp run dev` から実行する。
 
 ### CLI フレームワーク
 
@@ -129,11 +133,15 @@ type Config = {
 変更時は次の検証を行う。
 
 ```sh
-pnpm test
-pnpm lint
-pnpm check
-pnpm format
+vp check
+vp run test
+vp run verify
+vp check --fix
 ```
+
+`vp run setup` で Vite+ の Git hook を設定し、コミット時は `vp staged` を実行する。
+公開CLIのインストール時に開発用ツールを要求しないよう、hook設定は開発者が明示的に
+実行する。独立した ESLint、Oxlint、Oxfmt、lint-staged の設定は持たない。
 
 認証 Cookie の fixture は実データを使わず、合成 HTML、合成設定、合成 Cookie
 だけで検証する。Keychain、実ブラウザプロファイル、実際の Cookie 値をテスト成果
