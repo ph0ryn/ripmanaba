@@ -1,18 +1,20 @@
 import * as cheerio from "cheerio";
 
-import { fetchManabaText, getManabaOrigin } from "../http.ts";
-import { manabaPathToUrl, openUrl } from "../open.ts";
 import {
   extractCourseId,
   extractIdFromUrl,
+  manabaPathToUrl,
   normalizeText,
   optionalText,
+  parseCourseHeaderSummary,
+  ResourceParseError,
   resolveUrl,
   splitDelimitedText,
   type ElementSelection,
   textOf,
 } from "./helpers.ts";
 
+import type { ManabaClient } from "../http.ts";
 import type {
   ContentSummary,
   CourseInfoJson,
@@ -229,10 +231,17 @@ function parseTimetableCourses(
   return items;
 }
 
-function parseCourseListDocument($: CheerioAPI, baseUrl: string): CourseListItemDraft[] {
+export function parseCourseListDocument($: CheerioAPI, baseUrl: string): CourseListItemDraft[] {
   const itemsById = new Map<string, CourseListItemDraft>();
+  const courseListTables = $("table.stdlist.courselist");
+  const courseCards = $(".coursecard");
+  const timetableTables = $("table.stdlist").not(".courselist");
 
-  $("table.stdlist.courselist")
+  if (courseListTables.length === 0 && courseCards.length === 0 && timetableTables.length === 0) {
+    throw new ResourceParseError("course", "course list structure was not found");
+  }
+
+  courseListTables
     .find("tr")
     .slice(1)
     .each((rowIndex, row) => {
@@ -240,28 +249,26 @@ function parseCourseListDocument($: CheerioAPI, baseUrl: string): CourseListItem
       mergeCourseListItem(itemsById, parseCourseListRow($, $(row), baseUrl));
     });
 
-  $(".coursecard").each((cardIndex, card) => {
+  courseCards.each((cardIndex, card) => {
     void cardIndex;
     mergeCourseListItem(itemsById, parseCourseCard($, $(card), baseUrl));
   });
 
-  $("table.stdlist")
-    .not(".courselist")
-    .each((tableIndex, table) => {
-      void tableIndex;
+  timetableTables.each((tableIndex, table) => {
+    void tableIndex;
 
-      for (const item of parseTimetableCourses($, $(table), baseUrl)) {
-        mergeCourseListItem(itemsById, item);
-      }
-    });
+    for (const item of parseTimetableCourses($, $(table), baseUrl)) {
+      mergeCourseListItem(itemsById, item);
+    }
+  });
 
   return [...itemsById.values()];
 }
 
-export async function listCourses(): Promise<CourseListItemJson[]> {
-  const origin = await getManabaOrigin();
+export async function listCourses(client: ManabaClient): Promise<CourseListItemJson[]> {
+  const origin = client.origin;
   const listUrl = manabaPathToUrl(courseListPath, origin);
-  const html = await fetchManabaText(listUrl);
+  const html = await client.getText(listUrl);
   const $ = cheerio.load(html);
 
   return parseCourseListDocument($, listUrl).map((item) => ({
@@ -291,9 +298,7 @@ function parseHeaderMeta($: CheerioAPI): {
   return {
     courseCode: optionalText(header.find(".coursecode").first().text()),
     instructors: splitInstructors(instructorMatch?.[1]),
-    name:
-      optionalText(header.find(".pageheader-course-coursename a").first().text()) ??
-      optionalText(header.find(".pageheader-course-coursename").first().text()),
+    name: optionalText(header.find(".pageheader-course-coursename a").first().text()),
     schedule: termSchedule.schedule,
     term: termSchedule.term,
     year: instructorMatch?.[2],
@@ -428,32 +433,39 @@ function parseRecentContents($: CheerioAPI, baseUrl: string): ContentSummary[] {
   return contents;
 }
 
-export async function getCourseInfo(id: string): Promise<CourseInfoJson> {
-  const origin = await getManabaOrigin();
+export async function getCourseInfo(client: ManabaClient, id: string): Promise<CourseInfoJson> {
+  const origin = client.origin;
   const url = manabaPathToUrl(`course_${id}`, origin);
-  const html = await fetchManabaText(url);
+  const html = await client.getText(url);
   const $ = cheerio.load(html);
+  const course = parseCourseHeaderSummary($, url, "course");
+
+  if (course.id !== id) {
+    throw new ResourceParseError("course", `course URL id ${course.id} does not match ${id}`);
+  }
+
   const header = parseHeaderMeta($);
 
-  return {
+  const result: CourseInfoJson = {
     courseCode: header.courseCode,
     id,
     instructors: header.instructors,
-    name: header.name ?? id,
+    name: course.name,
     news: parseCourseNews($, url),
     recentContents: parseRecentContents($, url),
     recentTopics: parseRecentTopics($, url),
     resource: "course",
     schedule: header.schedule,
-    syllabusUrl: parseSyllabusUrl($, url),
     term: header.term,
     url,
     year: header.year,
   };
-}
 
-export async function openCourse(id: string): Promise<void> {
-  const origin = await getManabaOrigin();
+  const syllabusUrl = parseSyllabusUrl($, url);
 
-  await openUrl(manabaPathToUrl(`course_${id}`, origin));
+  if (syllabusUrl !== undefined) {
+    result.syllabusUrl = syllabusUrl;
+  }
+
+  return result;
 }

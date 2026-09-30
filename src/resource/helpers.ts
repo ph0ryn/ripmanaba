@@ -3,8 +3,15 @@ import type { CheerioAPI } from "cheerio";
 
 export type ElementSelection = ReturnType<CheerioAPI>;
 
-const coursePathPattern = /\/ct\/course_([^_/?#]+)/;
+const coursePathPattern = /\/ct\/course_([^_/?#]+)(?:[?#].*)?$/;
 const dateTimePattern = /\d{4}[-/]\d{1,2}[-/]\d{1,2}(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?/;
+
+export class ResourceParseError extends Error {
+  constructor(resource: string, message: string) {
+    super(`${resource}: ${message}`);
+    this.name = "ResourceParseError";
+  }
+}
 
 export function normalizeText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -30,6 +37,16 @@ export function textOf(element: ElementSelection): string {
 
 export function resolveUrl(rawHref: string, baseUrl: string): string {
   return new URL(rawHref, baseUrl).toString();
+}
+
+export function manabaPathToUrl(path: string, origin: string): string {
+  let normalizedPath = path;
+
+  if (!path.startsWith("/ct/")) {
+    normalizedPath = `/ct/${path.replace(/^\/+/, "")}`;
+  }
+
+  return new URL(normalizedPath, origin).toString();
 }
 
 export function pathFromUrl(url: string): string {
@@ -87,26 +104,31 @@ export function parseCourseSummary(
 
 export function parseCourseHeaderSummary(
   $: CheerioAPI,
-  fallbackCourse: CourseSummary,
-  options: { useHeaderNameFallback?: boolean } = {},
+  baseUrl: string,
+  resource: string,
 ): CourseSummary {
   const header = $(".pageheader-course").first();
-  const nameAnchor = header.find(".pageheader-course-coursename a").first();
-  const summary = parseCourseSummary(nameAnchor, fallbackCourse.url);
-  let fallbackName = fallbackCourse.name;
 
-  if (options.useHeaderNameFallback === true) {
-    fallbackName =
-      optionalText(header.find(".pageheader-course-coursename").text()) ?? fallbackName;
+  if (header.length === 0) {
+    throw new ResourceParseError(resource, "course header was not found");
   }
 
-  return (
-    summary ?? {
-      id: fallbackCourse.id,
-      name: fallbackName,
-      url: fallbackCourse.url,
-    }
-  );
+  const nameAnchor = header.find(".pageheader-course-coursename a").first();
+  const name = optionalText(nameAnchor.text());
+  const href = nameAnchor.attr("href");
+
+  if (name === undefined || href === undefined) {
+    throw new ResourceParseError(resource, "course name link was not found");
+  }
+
+  const url = resolveUrl(href, baseUrl);
+  const id = extractCourseId(url);
+
+  if (id === undefined) {
+    throw new ResourceParseError(resource, `invalid course URL: ${url}`);
+  }
+
+  return { id, name, url };
 }
 
 export interface ParseAttachmentLinksOptions {

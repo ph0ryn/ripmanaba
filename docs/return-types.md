@@ -2,17 +2,34 @@
 
 ## 方針
 
-`ripmanaba <resource> info <id>` と `ripmanaba <resource> ls` が返す
+`ripmanaba <resource> show <id>` と `ripmanaba <resource> list` が返す
 JSONのTypeScript型を定義する。
 
 ここでは、原則として対象resourceの詳細画面または対象resourceの一覧画面1ペー
 ジから取得できる情報だけを含める。別ページへの追加アクセスが必要な集計値や派
 生情報は含めない。
 
-`info` は対象resourceの詳細を返す。`ls` は `info` を実行するためのIDと、一覧
+`show` は対象resourceの詳細を返す。`list` は `show` を実行するためのIDと、一覧
 画面に表示されている最小限の補助情報を返す。複数ページを横断して集約しない。
-`ls` と `info` の各resource itemは、情報源となるmanaba画面の絶対URLを
+`list` と `show` の各resource itemは、情報源となるmanaba画面の絶対URLを
 `url` として必ず返す。originを除いた `path` は返却JSONには含めない。
+
+認証設定はresource JSONとは別のCLI内部データであり、CookieやKeychainの鍵を含め
+ない。`auth <url>` の入力はHTTPSかつ `*.manaba.jp` のhostに限り、設定には次の
+項目だけを保存する。
+
+```ts
+export type Config = {
+  version: number;
+  origin: string;
+  browser: "chrome" | "edge" | "firefox" | "safari";
+  profile?: string;
+};
+```
+
+通常コマンドは実行ごとに設定済みブラウザの現在のCookieを読み取る。ログイン画面
+へのredirectはCookieを転送せずエラーにする。Cookieの再取得retryやstorage state
+の永続化は行わない。
 
 対象resourceは、`docs/cli-command-design.md` でCLI実装対象として扱うものに絞
 る。
@@ -37,14 +54,16 @@ export type CourseSummary = {
 };
 ```
 
-## ls共通
+## list共通
 
-`ls` は一覧画面1ページから取得できる行をそのまま薄く正規化する。
+`list` は一覧画面1ページから取得できる行をそのまま薄く正規化する。
 返り値はラップしない配列とする。該当行がない場合は空配列を返す。
+必須のtable、見出し、または行に必要なリンクが欠損している場合は、空配列へ置き
+換えず解析エラーにする。
 
-## course ls
+## course list
 
-`course ls` はコース一覧画面のリスト表示から取得できる情報を返す。
+`course list` はコース一覧画面のリスト表示から取得できる情報を返す。
 
 ```ts
 export type CourseListItemJson = CourseSummary & {
@@ -72,9 +91,9 @@ export type CourseListItemJson = CourseSummary & {
 ]
 ```
 
-## task ls
+## task list
 
-`task ls` は未提出課題一覧画面から取得できる情報を返す。詳細画面は開かないた
+`task list` は未提出課題一覧画面から取得できる情報を返す。詳細画面は開かないた
 め、課題本文、提出状態、添付ファイルなどは含めない。
 
 ```ts
@@ -95,7 +114,7 @@ export type TaskListItemJson = {
 ```json
 [
   {
-    "id": "3004447",
+    "id": "2766689_query_3004447",
     "kind": "quiz",
     "title": "環境の経済学I（小テスト）",
     "url": "https://mgu.manaba.jp/ct/course_2766689_query_3004447",
@@ -111,9 +130,9 @@ export type TaskListItemJson = {
 ]
 ```
 
-## content ls
+## content list
 
-`content ls` はコース内のコンテンツ一覧画面1ページから取得できる情報を返す。
+`content list <course-id>` はコース内のコンテンツ一覧画面1ページから取得できる情報を返す。
 コースを横断してコンテンツを集約しない。
 
 ```ts
@@ -146,9 +165,9 @@ export type ContentListItemJson = {
 ]
 ```
 
-## notice ls
+## notice list
 
-`notice ls` はホーム画面のお知らせ欄から取得できる全体お知らせの情報を返す。
+`notice list` はホーム画面のお知らせ欄から取得できる全体お知らせの情報を返す。
 コースニュースは含めない。
 
 ```ts
@@ -173,9 +192,9 @@ export type NoticeListItemJson = {
 ]
 ```
 
-## submission ls
+## submission list
 
-`submission ls` は提出記録画面の現在表示されている1ページから取得できる情報を
+`submission list` は提出記録画面の現在表示されている1ページから取得できる情報を
 返す。前後ページや期間違いのページを横断して集約しない。
 
 ```ts
@@ -196,9 +215,9 @@ export type SubmissionListItemJson = {
 []
 ```
 
-## new
+## updates
 
-`ripmanaba new` はホーム画面のコース一覧に出る未読・未処理ステータスを返
+`ripmanaba updates` はホーム画面のコース一覧に出る未読・未処理ステータスを返
 す。返り値はラップしない配列とし、赤アイコンがないコースは含めない。
 
 ```ts
@@ -227,7 +246,7 @@ export type NewCourseStatusJson = {
 
 ## course
 
-`course info` はコース詳細画面から取得できる情報を返す。
+`course show` はコース詳細画面から取得できる情報を返す。
 
 ```ts
 export type CourseInfoJson = {
@@ -310,7 +329,7 @@ export type ContentSummary = {
 
 ## task
 
-`task info` はレポート、小テスト、アンケートなどの課題詳細画面から取得できる情
+`task show` はレポート、小テスト、アンケートなどの課題詳細画面から取得できる情
 報を返す。課題種別ごとに表示項目が異なるため、共通部分と種別別の差分に分ける。
 
 ```ts
@@ -357,18 +376,25 @@ export type QuizTaskInfoJson = TaskBaseInfoJson & {
   gradingResultAndCorrectAnswerDisclosure?: string;
 };
 
+// Survey details currently reuse the query-shaped parser. The live survey DOM
+// has not been verified yet.
 export type SurveyTaskInfoJson = TaskBaseInfoJson & {
   kind: "survey";
   portfolioSetting?: string;
 };
 ```
 
+`task show` と `task open` は、`<course-id>_<report|query|survey>_<task-id>` 形式の
+複合IDから詳細URLを直接算出する。未提出課題一覧には依存しないため、提出済みまたは
+一覧にない課題もmanabaの閲覧権限と認証範囲に含まれていれば対象にする。アンケート
+の詳細画面はquery系DOM解析で扱う。現物のsurvey詳細DOMはまだ確認していない。
+
 レポート例:
 
 ```json
 {
   "resource": "task",
-  "id": "3008513",
+  "id": "2766776_report_3008513",
   "kind": "report",
   "url": "https://mgu.manaba.jp/ct/course_2766776_report_3008513",
   "title": "第５回(5月２８日授業関連)",
@@ -399,7 +425,7 @@ export type SurveyTaskInfoJson = TaskBaseInfoJson & {
 ```json
 {
   "resource": "task",
-  "id": "3004447",
+  "id": "2766689_query_3004447",
   "kind": "quiz",
   "url": "https://mgu.manaba.jp/ct/course_2766689_query_3004447",
   "title": "環境の経済学I（小テスト）",
@@ -426,7 +452,7 @@ export type SurveyTaskInfoJson = TaskBaseInfoJson & {
 
 ## content
 
-`content info` はコースコンテンツ詳細画面から取得できる情報を返す。
+`content show` はコースコンテンツ詳細画面から取得できる情報を返す。
 
 ```ts
 export type ContentInfoJson = {
@@ -463,6 +489,15 @@ export type ContentPageSummary = {
 };
 ```
 
+`content show` と `content open` は `<content-id>` と
+`<content-id>_<page-id>` の両方を受け付ける。後者では `currentPage` に指定ページ
+を反映し、返却JSONのトップレベル `id` も同じ複合IDにする。コンテンツ全体の
+`id` は `<content-id>`、`currentPage.id` と `pages[].id` は常に
+`<content-id>_<page-id>` とする。bareな `<page-id>` は返さない。返却IDはそのまま
+`content show/open` に渡せる。content IDは
+`^[A-Za-z0-9-]+(?:_[A-Za-z0-9-]+)?$` に一致する安全なASCII文字列で、数字と `c`
+の組み合わせには限定しない。
+
 例:
 
 ```json
@@ -480,7 +515,7 @@ export type ContentPageSummary = {
   "publishedUntil": "2026-07-29 16:10",
   "updatedAt": "2026-05-26 23:53",
   "currentPage": {
-    "id": "3222717961",
+    "id": "2940479c2766689_3222717961",
     "title": "環境の経済学第一回目の講義スライド",
     "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_3222717961",
     "publishedFrom": "2026-04-07 16:10:00",
@@ -498,37 +533,37 @@ export type ContentPageSummary = {
   },
   "pages": [
     {
-      "id": "538409077",
+      "id": "2940479c2766689_538409077",
       "title": "環境の経済学第７回（不確実性と政策選択）",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_538409077"
     },
     {
-      "id": "269961513",
+      "id": "2940479c2766689_269961513",
       "title": "環境の経済学第６回（排出量取引）",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_269961513"
     },
     {
-      "id": "1612135122",
+      "id": "2940479c2766689_1612135122",
       "title": "環境の経済学第5回目講義（コースの定理）",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_1612135122"
     },
     {
-      "id": "2685868069",
+      "id": "2940479c2766689_2685868069",
       "title": "環境の経済学第４回目講義スライド",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_2685868069"
     },
     {
-      "id": "2965621",
+      "id": "2940479c2766689_2965621",
       "title": "環境の経済学第３回講義スライド",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_2965621"
     },
     {
-      "id": "2148979199",
+      "id": "2940479c2766689_2148979199",
       "title": "環境の経済学第２回目講義スライド",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_2148979199"
     },
     {
-      "id": "3222717961",
+      "id": "2940479c2766689_3222717961",
       "title": "環境の経済学第一回目の講義スライド",
       "url": "https://mgu.manaba.jp/ct/page_2940479c2766689_3222717961"
     }
@@ -538,7 +573,7 @@ export type ContentPageSummary = {
 
 ## notice
 
-`notice info` は全体お知らせ詳細画面から取得できる情報を返す。コースニュースは
+`notice show` は全体お知らせ詳細画面から取得できる情報を返す。コースニュースは
 この型には含めない。
 
 ```ts
@@ -569,8 +604,10 @@ export type NoticeInfoJson = {
 
 ## submission
 
-`submission info` は提出記録画面の提出行から取得できる情報を返す。提出記録は横
-断一覧として扱い、提出物の元課題詳細ページを追加で開かない。
+`submission show` は提出記録画面の提出行から取得できる情報を返す。実行時に取得
+する提出記録一覧の現在の1ページにある提出IDだけを対象にし、ページをまたいだ検索
+や追加取得は行わない。提出記録は横断一覧として扱い、提出物の元課題詳細ページを
+追加で開かない。
 
 ```ts
 export type SubmissionInfoJson = {

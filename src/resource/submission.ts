@@ -1,20 +1,23 @@
 import * as cheerio from "cheerio";
 
-import { fetchManabaText, getManabaOrigin } from "../http.ts";
-import { manabaPathToUrl, openUrl } from "../open.ts";
 import {
+  manabaPathToUrl,
   optionalText,
   pathFromUrl,
   parseCourseSummary,
   resolveUrl,
+  ResourceParseError,
+  textOf,
   type ElementSelection,
 } from "./helpers.ts";
 
+import type { ManabaClient } from "../http.ts";
 import type { SubmissionInfoJson, SubmissionKind, SubmissionListItemJson } from "./types.ts";
 import type { CheerioAPI } from "cheerio";
 
 const submissionListPath = "/ct/home_submitlog";
-const taskPathPattern = /\/ct\/course_[^_]+_(report|query|survey|drill|project)_([^/?#]+)/;
+const taskPathPattern =
+  /\/ct\/course_[^_]+_(report|query|survey|drill|project)_([^/?#]+)(?:[?#].*)?$/;
 
 function parseSubmissionTaskPath(
   url: string,
@@ -49,6 +52,10 @@ function kindFromLabel(label: string | undefined): SubmissionKind {
   }
 
   if (label.includes("小テスト")) {
+    return "quiz";
+  }
+
+  if (label.includes("クイズ")) {
     return "quiz";
   }
 
@@ -94,14 +101,20 @@ function parseSubmittedAt(dateLabel: string, timeLabel: string): string | undefi
   return `${date} ${time}`;
 }
 
-function findSubmissionTable($: CheerioAPI): ElementSelection {
+function findSubmissionTable($: CheerioAPI): ElementSelection | undefined {
   const table = $("table.edit").first();
 
   if (table.length > 0) {
     return table;
   }
 
-  return $("a[href*='course_']").first().closest("table");
+  const fallback = $("a[href*='course_']").first().closest("table");
+
+  if (fallback.length > 0) {
+    return fallback;
+  }
+
+  return undefined;
 }
 
 interface ParseSubmissionRowInput {
@@ -167,12 +180,21 @@ function parseSubmissionRow(input: ParseSubmissionRowInput): {
   };
 }
 
-export async function listSubmissions(): Promise<SubmissionListItemJson[]> {
-  const origin = await getManabaOrigin();
+export async function listSubmissions(client: ManabaClient): Promise<SubmissionListItemJson[]> {
+  const origin = client.origin;
   const listUrl = manabaPathToUrl(submissionListPath, origin);
-  const html = await fetchManabaText(listUrl);
+  const html = await client.getText(listUrl);
   const $ = cheerio.load(html);
   const table = findSubmissionTable($);
+
+  if (table === undefined) {
+    if (textOf($("body")).includes("この期間の提出記録はありません")) {
+      return [];
+    }
+
+    throw new ResourceParseError("submission", "submission list table was not found");
+  }
+
   const items: SubmissionListItemJson[] = [];
   let currentDate: string | undefined = undefined;
 
@@ -194,8 +216,17 @@ export async function listSubmissions(): Promise<SubmissionListItemJson[]> {
   return items;
 }
 
-export async function getSubmissionInfo(id: string): Promise<SubmissionInfoJson> {
-  const item = (await listSubmissions()).find((candidate) => candidate.id === id);
+export async function getSubmissionInfo(
+  client: ManabaClient,
+  id: string,
+): Promise<SubmissionInfoJson> {
+  const items = (await listSubmissions(client)).filter((candidate) => candidate.id === id);
+
+  if (items.length > 1) {
+    throw new Error(`Submission ${id} is ambiguous in the submission log.`);
+  }
+
+  const item = items[0];
 
   if (item === undefined) {
     throw new Error(`Submission ${id} was not found in the submission log.`);
@@ -205,10 +236,4 @@ export async function getSubmissionInfo(id: string): Promise<SubmissionInfoJson>
     ...item,
     resource: "submission",
   };
-}
-
-export async function openSubmission(id: string): Promise<void> {
-  const info = await getSubmissionInfo(id);
-
-  await openUrl(info.url);
 }

@@ -1,47 +1,42 @@
 import { spawn } from "node:child_process";
 
-import { requireSessionConfig } from "./session.ts";
+export async function openUrl(url: string): Promise<void> {
+  const parsed = new URL(url);
 
-export function normalizeManabaPath(path: string): string {
-  if (path.startsWith("/ct/")) {
-    return path;
+  if (parsed.protocol !== "https:") {
+    throw new Error("Only HTTPS browser links are supported.");
   }
 
-  return `/ct/${path.replace(/^\/+/, "")}`;
-}
-
-export function manabaPathToUrl(path: string, origin: string): string {
-  return new URL(normalizeManabaPath(path), origin).toString();
-}
-
-export async function openManabaPath(path: string): Promise<void> {
-  const config = await requireSessionConfig();
-  const url = manabaPathToUrl(path, config.origin);
-
-  await openUrl(url);
-}
-
-export async function openUrl(url: string): Promise<void> {
   let command = "xdg-open";
   let args = [url];
 
   if (process.platform === "darwin") {
     command = "open";
-  }
-
-  if (process.platform === "win32") {
-    command = "cmd";
-    args = ["/c", "start", "", url];
+  } else if (process.platform === "win32") {
+    command = "rundll32";
+    args = ["url.dll,FileProtocolHandler", url];
   }
 
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, { detached: true, stdio: "ignore" });
-
-    child.once("error", reject);
-
-    child.once("spawn", () => {
+    const timer = setTimeout(() => {
       child.unref();
       resolve();
+    }, 1000);
+
+    child.once("error", () => {
+      clearTimeout(timer);
+      reject(new Error("Unable to start the system browser."));
+    });
+
+    child.once("exit", (code, signal) => {
+      clearTimeout(timer);
+
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Browser opener failed (${signal ?? code}).`));
+      }
     });
   });
 }
