@@ -1,120 +1,38 @@
-import { stdin as input, stdout as output } from "node:process";
-import { createInterface } from "node:readline/promises";
-
-import { chromium } from "playwright";
-
+import { createManabaClient, type ManabaClient } from "./http.ts";
 import {
-  browserProfileDirectory,
+  normalizeManabaOrigin,
+  parseBrowser,
   type SessionConfig,
-  storageStateFile,
-  writeBrowserStorageState,
+  validateSessionConfig,
   writeSessionConfig,
 } from "./session.ts";
 
-const sessionRefreshTimeout = 30_000;
-
-function normalizeOrigin(url: string): string {
-  return new URL(url).origin;
+export interface AuthOptions {
+  browser: string;
+  config?: string;
+  profile?: string;
 }
 
-function findOpenPageUrl(
-  context: Awaited<ReturnType<typeof chromium.launchPersistentContext>>,
-): string | undefined {
-  const pages = [...context.pages()].reverse();
+export async function authenticate(
+  url: string,
+  options: AuthOptions,
+  createClient: (config: SessionConfig) => Promise<ManabaClient> = createManabaClient,
+): Promise<SessionConfig> {
+  const selection: SessionConfig = {
+    browser: parseBrowser(options.browser),
+    origin: normalizeManabaOrigin(url),
+    version: 1,
+  };
 
-  for (const page of pages) {
-    const url = page.url();
-
-    if (url !== "about:blank") {
-      return url;
-    }
+  if (options.profile !== undefined) {
+    selection.profile = options.profile;
   }
 
-  return undefined;
-}
+  const config = validateSessionConfig(selection);
+  const client = await createClient(config);
 
-async function waitForUserLogin(): Promise<void> {
-  const readline = createInterface({ input, output });
+  await client.getText("/ct/home");
+  await writeSessionConfig(config, options.config);
 
-  try {
-    await readline.question(
-      "Open manaba in the browser, log in, then return to this terminal and press Enter.",
-    );
-  } finally {
-    readline.close();
-  }
-}
-
-async function confirmSessionOrigin(origin: string): Promise<boolean> {
-  const readline = createInterface({ input, output });
-
-  try {
-    const answer = await readline.question(`Save manaba session for ${origin}? [y/N] `);
-
-    return answer.trim().toLowerCase() === "y";
-  } finally {
-    readline.close();
-  }
-}
-
-export async function authenticate(): Promise<void> {
-  const context = await chromium.launchPersistentContext(browserProfileDirectory, {
-    headless: false,
-  });
-
-  try {
-    if (context.pages().length === 0) {
-      await context.newPage();
-    }
-
-    await context.pages()[0]?.bringToFront();
-    await waitForUserLogin();
-
-    const currentUrl = findOpenPageUrl(context);
-
-    if (currentUrl === undefined) {
-      throw new Error("No manaba page is open. Open manaba and log in before pressing Enter.");
-    }
-
-    const origin = normalizeOrigin(currentUrl);
-
-    if (!(await confirmSessionOrigin(origin))) {
-      console.log("Canceled. Session was not saved.");
-
-      return;
-    }
-
-    await writeBrowserStorageState(context, storageStateFile);
-
-    await writeSessionConfig({
-      authenticatedAt: new Date().toISOString(),
-      browserProfileDirectory,
-      origin,
-      storageStateFile,
-    });
-
-    console.log(`Saved manaba session for ${origin}`);
-  } finally {
-    await context.close();
-  }
-}
-
-export async function refreshAuthenticatedSession(config: SessionConfig): Promise<void> {
-  const context = await chromium.launchPersistentContext(config.browserProfileDirectory, {
-    headless: true,
-  });
-
-  try {
-    const page = context.pages()[0] ?? (await context.newPage());
-
-    await page.goto(new URL("/ct/home", config.origin).toString());
-
-    await page.waitForURL((url) => url.origin === config.origin, {
-      timeout: sessionRefreshTimeout,
-    });
-
-    await writeBrowserStorageState(context, config.storageStateFile);
-  } finally {
-    await context.close();
-  }
+  return config;
 }

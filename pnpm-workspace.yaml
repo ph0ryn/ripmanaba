@@ -2,10 +2,12 @@ packages:
   - .
 
 catalog:
+  '@steipete/sweet-cookie': 0.4.4
   '@stylistic/eslint-plugin': ^5.10.0
+  '@types/bun': ^1.4.2
   '@typescript/native-preview': 7.0.0-dev.20260430.1
   cheerio: ^1.2.0
-  clean-pkg-json: ^1.4.2
+  commander: 15.0.0
   eslint: ^10.3.0
   eslint-plugin-oxlint: ^1.62.0
   lint-staged: ^16.4.0

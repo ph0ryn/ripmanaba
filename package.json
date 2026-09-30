@@ -20,35 +20,33 @@
   ],
   "scripts": {
     "dev": "bun src/index.ts",
-    "format": "pnpm run lint --fix . ; oxfmt . ; eslint --fix .",
-    "lint": "oxlint --type-aware --type-check",
-    "prepack": "clean-pkg-json -r devDependencies",
-    "precommit": "pnpm run format"
+    "format": "oxfmt . && oxlint --fix --type-aware --type-check . && eslint --fix . && oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint --type-aware --type-check . && eslint .",
+    "test": "bun test",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run test"
   },
   "lint-staged": {
-    "src/**/*.ts": [
-      "pnpm run precommit"
+    "**/*.{ts,tsx,js,mjs,cjs}": [
+      "oxfmt",
+      "oxlint --fix --type-aware --type-check",
+      "eslint --fix",
+      "oxfmt"
     ],
-    "*.{js,mjs}": [
-      "pnpm run format"
-    ],
-    "*.{json,jsonc}": [
-      "pnpm oxfmt ."
-    ],
-    "package.json": [
-      "sort-package-json"
+    "**/*.{json,jsonc,yml,yaml,md}": [
+      "oxfmt"
     ]
   },
   "dependencies": {
-    "cac": "^6.7.14",
+    "@steipete/sweet-cookie": "catalog:",
     "cheerio": "catalog:",
-    "playwright": "^1.57.0"
+    "commander": "catalog:"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "catalog:",
+    "@types/bun": "catalog:",
     "@types/node": "^25.0.0",
     "@typescript/native-preview": "catalog:",
-    "clean-pkg-json": "catalog:",
     "eslint": "catalog:",
     "eslint-plugin-oxlint": "catalog:",
     "lint-staged": "catalog:",
@@ -61,7 +59,7 @@
   },
   "packageManager": "pnpm@11.1.1",
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.3.13"
   },
   "publishConfig": {
     "access": "public"

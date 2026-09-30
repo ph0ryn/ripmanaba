@@ -1,18 +1,19 @@
 import * as cheerio from "cheerio";
 
-import { fetchManabaText, getManabaOrigin } from "../http.ts";
-import { manabaPathToUrl, openUrl } from "../open.ts";
 import {
   extractIdFromUrl,
+  manabaPathToUrl,
   optionalText,
   parseAttachmentLinks,
   parseCourseHeaderSummary,
   parseDateTime,
+  ResourceParseError,
   resolveUrl,
   type ElementSelection,
   textOf,
 } from "./helpers.ts";
 
+import type { ManabaClient } from "../http.ts";
 import type {
   AttachmentInfo,
   ContentInfoJson,
@@ -25,7 +26,7 @@ import type { CheerioAPI } from "cheerio";
 
 const contentListPath = (courseId: string) => `/ct/course_${courseId}_page`;
 const contentPathPattern = /\/ct\/page_([^_/?#]+)/;
-const contentPagePathPattern = /\/ct\/page_[^_/?#]+_([^_/?#]+)/;
+const contentPagePathPattern = /\/ct\/page_([a-zA-Z0-9-]+_[a-zA-Z0-9-]+)(?:[?#].*)?$/;
 
 function extractContentId(url: string): string | undefined {
   return extractIdFromUrl(url, contentPathPattern);
@@ -129,35 +130,44 @@ function parseContentListRow(input: ParseContentListRowInput): ContentListItemJs
   };
 }
 
-export async function listContents(courseId: string): Promise<ContentListItemJson[]> {
-  const origin = await getManabaOrigin();
+export async function listContents(
+  client: ManabaClient,
+  courseId: string,
+): Promise<ContentListItemJson[]> {
+  const origin = client.origin;
   const listUrl = manabaPathToUrl(contentListPath(courseId), origin);
-  const html = await fetchManabaText(listUrl);
+  const html = await client.getText(listUrl);
   const $ = cheerio.load(html);
-  const fallbackCourse: CourseSummary = {
-    id: courseId,
-    name: "",
-    url: manabaPathToUrl(`/ct/course_${courseId}`, origin),
-  };
-  const course = parseCourseHeaderSummary($, fallbackCourse, { useHeaderNameFallback: true });
+  const table = $("table.contentslist").first();
+
+  if (table.length === 0) {
+    throw new ResourceParseError("content", "content list table was not found");
+  }
+
+  const course = parseCourseHeaderSummary($, listUrl, "content");
+
+  if (course.id !== courseId) {
+    throw new ResourceParseError(
+      "content",
+      `course URL id ${course.id} does not match ${courseId}`,
+    );
+  }
+
   const items: ContentListItemJson[] = [];
 
-  $("table.contentslist")
-    .first()
-    .find("tr")
-    .each((rowIndex, row) => {
-      void rowIndex;
-      const item = parseContentListRow({
-        $,
-        baseUrl: listUrl,
-        course,
-        row: $(row),
-      });
-
-      if (item !== undefined) {
-        items.push(item);
-      }
+  table.find("tr").each((rowIndex, row) => {
+    void rowIndex;
+    const item = parseContentListRow({
+      $,
+      baseUrl: listUrl,
+      course,
+      row: $(row),
     });
+
+    if (item !== undefined) {
+      items.push(item);
+    }
+  });
 
   return items;
 }
@@ -176,7 +186,7 @@ function parseContentTitle($: CheerioAPI): string | undefined {
   return undefined;
 }
 
-function parsePages($: CheerioAPI, baseUrl: string): ContentPageSummary[] {
+export function parsePages($: CheerioAPI, baseUrl: string): ContentPageSummary[] {
   const pages: ContentPageSummary[] = [];
   const seenUrls = new Set<string>();
 
@@ -192,15 +202,16 @@ function parsePages($: CheerioAPI, baseUrl: string): ContentPageSummary[] {
       }
 
       const url = resolveUrl(href, baseUrl);
+      const id = extractContentPageId(url);
 
-      if (seenUrls.has(url)) {
+      if (id === undefined || seenUrls.has(url)) {
         return;
       }
 
       seenUrls.add(url);
 
       pages.push({
-        id: extractContentPageId(url),
+        id,
         title,
         url,
       });
@@ -225,6 +236,12 @@ function parseCurrentPage(
   baseUrl: string,
   contentTitle: string,
 ): ContentPageInfo | undefined {
+  const pageId = extractContentPageId(baseUrl);
+
+  if (pageId === undefined) {
+    return undefined;
+  }
+
   const pageTitle =
     optionalText($(".contents-page-title, .page-title, h2").first().text()) ?? contentTitle;
   const attachments = parseContentAttachments($, baseUrl);
@@ -247,24 +264,44 @@ function parseCurrentPage(
 
   page.updatedBy = updatedByMatch?.[1];
 
-  if (attachments.length === 0 && page.id === undefined && pageTitle === contentTitle) {
-    return undefined;
-  }
-
   return page;
 }
 
-export async function getContentInfo(id: string): Promise<ContentInfoJson> {
-  const origin = await getManabaOrigin();
-  const url = manabaPathToUrl(`page_${id}`, origin);
-  const html = await fetchManabaText(url);
+export async function getContentInfo(client: ManabaClient, id: string): Promise<ContentInfoJson> {
+  const parts = id.split("_");
+
+  if (!/^[a-zA-Z0-9-]+(?:_[a-zA-Z0-9-]+)?$/.test(id)) {
+    throw new Error(`Content id must be <content-id> or <content-id>_<page-id>: ${id}`);
+  }
+
+  const contentId = parts[0];
+  const pageId = parts[1];
+
+  if (contentId === undefined) {
+    throw new Error(`Content id must be <content-id> or <content-id>_<page-id>: ${id}`);
+  }
+
+  let path = `page_${contentId}`;
+
+  if (pageId !== undefined) {
+    path = `page_${contentId}_${pageId}`;
+  }
+
+  const url = manabaPathToUrl(path, client.origin);
+  const html = await client.getText(url);
   const $ = cheerio.load(html);
   const documentText = textOf($("body"));
-  const title = parseContentTitle($) ?? id;
+  const title = parseContentTitle($);
+
+  if (title === undefined) {
+    throw new ResourceParseError("content", "content title was not found");
+  }
+
   const range = parsePublishedRange(documentText);
+  const course = parseCourseHeaderSummary($, url, "content");
 
   return {
-    course: parseCourseHeaderSummary($, { id: "", name: "", url }, { useHeaderNameFallback: true }),
+    course,
     currentPage: parseCurrentPage($, url, title),
     id,
     pages: parsePages($, url),
@@ -275,10 +312,4 @@ export async function getContentInfo(id: string): Promise<ContentInfoJson> {
     updatedAt: parseUpdatedAt(documentText),
     url,
   };
-}
-
-export async function openContent(id: string): Promise<void> {
-  const origin = await getManabaOrigin();
-
-  await openUrl(manabaPathToUrl(`page_${id}`, origin));
 }

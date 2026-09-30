@@ -1,9 +1,15 @@
 import * as cheerio from "cheerio";
 
-import { fetchManabaText, getManabaOrigin } from "../http.ts";
-import { manabaPathToUrl } from "../open.ts";
-import { extractCourseId, optionalText, resolveUrl, type ElementSelection } from "./helpers.ts";
+import {
+  extractCourseId,
+  manabaPathToUrl,
+  optionalText,
+  resolveUrl,
+  ResourceParseError,
+  type ElementSelection,
+} from "./helpers.ts";
 
+import type { ManabaClient } from "../http.ts";
 import type { CourseStatusKind, NewCourseStatusJson } from "./types.ts";
 import type { CheerioAPI } from "cheerio";
 
@@ -114,22 +120,36 @@ function parseNewCourseStatusItem(
   };
 }
 
-export async function listNewCourseStatuses(): Promise<NewCourseStatusJson[]> {
-  const origin = await getManabaOrigin();
+export async function listCourseUpdates(client: ManabaClient): Promise<NewCourseStatusJson[]> {
+  const origin = client.origin;
   const homeUrl = manabaPathToUrl(homePath, origin);
-  const html = await fetchManabaText(homeUrl);
+  const html = await client.getText(homeUrl);
   const $ = cheerio.load(html);
+  const roots = $(".courselistweekly-c, tr.courselist-c");
+
+  if (roots.length === 0 && $("table.stdlist.courselist").length === 0) {
+    throw new ResourceParseError("updates", "home course list structure was not found");
+  }
+
   const itemsByCourseId = new Map<string, NewCourseStatusJson>();
 
-  $(".courselistweekly-c, tr.courselist-c").each((rootIndex, root) => {
+  roots.each((rootIndex, root) => {
     void rootIndex;
     const item = parseNewCourseStatusItem($, $(root), homeUrl);
 
-    if (item === undefined || itemsByCourseId.has(item.course.id)) {
+    if (item === undefined) {
       return;
     }
 
-    itemsByCourseId.set(item.course.id, item);
+    const existing = itemsByCourseId.get(item.course.id);
+
+    if (existing === undefined) {
+      itemsByCourseId.set(item.course.id, item);
+
+      return;
+    }
+
+    existing.kinds = [...new Set([...existing.kinds, ...item.kinds])];
   });
 
   return [...itemsByCourseId.values()];

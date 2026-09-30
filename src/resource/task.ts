@@ -1,18 +1,18 @@
 import * as cheerio from "cheerio";
 
-import { fetchManabaText, getManabaOrigin } from "../http.ts";
-import { manabaPathToUrl, openUrl } from "../open.ts";
 import {
   optionalText,
   parseAttachmentLinks,
   parseCourseHeaderSummary,
   parseCourseSummary,
   pathFromUrl,
+  ResourceParseError,
   resolveUrl,
   type ElementSelection,
   textOf,
 } from "./helpers.ts";
 
+import type { ManabaClient } from "../http.ts";
 import type {
   AttachmentInfo,
   ReportTaskInfoJson,
@@ -26,45 +26,102 @@ import type {
 import type { CheerioAPI } from "cheerio";
 
 const taskListPath = "/ct/home_library_query";
-const taskPathPattern = /\/ct\/course_[^_]+_(report|query|survey)_([^/?#]+)/;
+const taskPathPattern = /\/ct\/course_([^_/?#]+)_(report|query|survey)_([^/?#]+)(?:[?#].*)?$/;
+const taskIdPattern = /^([^_]+)_(report|query|survey)_(.+)$/;
 
-function parseTaskPath(url: string): { id: string; kind: TaskKind } | undefined {
+interface ParsedTaskPath {
+  courseId: string;
+  id: string;
+  kind: TaskKind;
+  taskId: string;
+}
+
+function taskKindFromSegment(segment: string): TaskKind | undefined {
+  if (segment === "report") {
+    return "report";
+  }
+
+  if (segment === "query") {
+    return "quiz";
+  }
+
+  if (segment === "survey") {
+    return "survey";
+  }
+
+  return undefined;
+}
+
+function parseTaskPath(url: string): ParsedTaskPath | undefined {
   const match = taskPathPattern.exec(pathFromUrl(url));
 
   if (match === null) {
     return undefined;
   }
 
-  const rawKind = match[1];
-  const id = match[2];
+  const courseId = match[1];
+  const rawKind = match[2];
+  const taskId = match[3];
 
-  if (id === undefined) {
+  if (courseId === undefined || rawKind === undefined || taskId === undefined) {
     return undefined;
   }
 
-  if (rawKind === "report") {
-    return { id, kind: "report" };
+  const kind = taskKindFromSegment(rawKind);
+
+  if (kind === undefined) {
+    return undefined;
   }
 
-  if (rawKind === "query") {
-    return { id, kind: "quiz" };
-  }
-
-  if (rawKind === "survey") {
-    return { id, kind: "survey" };
-  }
-
-  return undefined;
+  return {
+    courseId,
+    id: `${courseId}_${rawKind}_${taskId}`,
+    kind,
+    taskId,
+  };
 }
 
-function findTaskDetailAnchor($: CheerioAPI, row: ElementSelection): ElementSelection | undefined {
+function parseTaskId(id: string): ParsedTaskPath | undefined {
+  const match = taskIdPattern.exec(id);
+
+  if (match === null) {
+    return undefined;
+  }
+
+  const courseId = match[1];
+  const rawKind = match[2];
+  const taskId = match[3];
+
+  if (courseId === undefined || rawKind === undefined || taskId === undefined) {
+    return undefined;
+  }
+
+  const kind = taskKindFromSegment(rawKind);
+
+  if (kind === undefined) {
+    return undefined;
+  }
+
+  return {
+    courseId,
+    id,
+    kind,
+    taskId,
+  };
+}
+
+function findTaskDetailAnchor(
+  $: CheerioAPI,
+  row: ElementSelection,
+  baseUrl: string,
+): ElementSelection | undefined {
   const anchors = row.find("a").toArray();
 
   for (const anchor of anchors) {
     const selection = $(anchor);
     const href = selection.attr("href");
 
-    if (href !== undefined && /course_[^_]+_(report|query|survey)_[^/?#]+/.test(href)) {
+    if (href !== undefined && parseTaskPath(resolveUrl(href, baseUrl)) !== undefined) {
       return selection;
     }
   }
@@ -83,7 +140,7 @@ function parseTaskListRow(
     return undefined;
   }
 
-  const detailAnchor = findTaskDetailAnchor($, row);
+  const detailAnchor = findTaskDetailAnchor($, row, baseUrl);
 
   if (detailAnchor === undefined) {
     return undefined;
@@ -121,15 +178,19 @@ function parseTaskListRow(
   };
 }
 
-export async function listTasks(): Promise<TaskListItemJson[]> {
-  const origin = await getManabaOrigin();
-  const listUrl = manabaPathToUrl(taskListPath, origin);
-  const html = await fetchManabaText(listUrl);
+export async function listTasks(client: ManabaClient): Promise<TaskListItemJson[]> {
+  const listUrl = new URL(taskListPath, client.origin).toString();
+  const html = await client.getText(listUrl);
   const $ = cheerio.load(html);
+  const table = $("table.stdlist").first();
+
+  if (table.length === 0) {
+    throw new ResourceParseError("task", "task list table was not found");
+  }
+
   const items: TaskListItemJson[] = [];
 
-  $("table.stdlist")
-    .first()
+  table
     .find("tr")
     .slice(1)
     .each((rowIndex, row) => {
@@ -144,23 +205,22 @@ export async function listTasks(): Promise<TaskListItemJson[]> {
   return items;
 }
 
-async function findTaskListItem(id: string): Promise<TaskListItemJson> {
-  const items = await listTasks();
-  const item = items.find((candidate) => candidate.id === id);
-
-  if (item === undefined) {
-    throw new Error(`Task ${id} was not found in the unsubmitted task list.`);
-  }
-
-  return item;
-}
-
 function parseDetailRows(
   $: CheerioAPI,
   table: ElementSelection,
 ): { title: string; fields: Map<string, ElementSelection> } {
   const rows = table.find("tr");
-  const title = textOf(rows.first());
+
+  if (rows.length === 0) {
+    throw new ResourceParseError("task", "task detail table has no rows");
+  }
+
+  const title = optionalText(rows.first().text());
+
+  if (title === undefined) {
+    throw new ResourceParseError("task", "task detail title is empty");
+  }
+
   const fields = new Map<string, ElementSelection>();
 
   rows.slice(1).each((rowIndex, row) => {
@@ -268,7 +328,8 @@ function parseResubmissionAllowed(label: string | undefined): boolean | undefine
 interface CreateTaskBaseInput {
   $: CheerioAPI;
   fields: Map<string, ElementSelection>;
-  listItem: TaskListItemJson;
+  task: ParsedTaskPath;
+  url: string;
   title: string;
 }
 
@@ -276,33 +337,43 @@ function createTaskBase(input: CreateTaskBaseInput): TaskBaseInfoJson {
   const statusLabel = firstFieldText(input.fields, ["状態"]);
 
   return {
-    attachments: parseAttachments(input.$, input.fields.get("添付ファイル"), input.listItem.url),
-    course: parseCourseHeaderSummary(input.$, input.listItem.course),
+    attachments: parseAttachments(input.$, input.fields.get("添付ファイル"), input.url),
+    course: parseCourseHeaderSummary(input.$, input.url, "task"),
     description: firstFieldText(input.fields, ["課題に関する説明"]),
     endsAt: firstFieldText(input.fields, ["受付終了日時"]),
-    id: input.listItem.id,
-    kind: input.listItem.kind,
+    id: input.task.id,
+    kind: input.task.kind,
     resource: "task",
     startsAt: firstFieldText(input.fields, ["受付開始日時"]),
     status: parseStatus(statusLabel),
     submission: parseSubmission(statusLabel),
     title: input.title,
-    url: input.listItem.url,
+    url: input.url,
   };
 }
 
-export async function getTaskInfo(id: string): Promise<TaskInfoJson> {
-  const listItem = await findTaskListItem(id);
-  const html = await fetchManabaText(listItem.url);
+export async function getTaskInfo(client: ManabaClient, id: string): Promise<TaskInfoJson> {
+  const task = parseTaskId(id);
+
+  if (task === undefined) {
+    throw new Error(`Task id must be <course-id>_<report|query|survey>_<task-id>: ${id}`);
+  }
+
+  const url = new URL(`/ct/course_${id}`, client.origin).toString();
+  const html = await client.getText(url);
   const $ = cheerio.load(html);
-  const table = $("table.stdlist-report, table.stdlist-query").first();
+  let table = $("table.stdlist-report").first();
+
+  if (task.kind === "quiz" || task.kind === "survey") {
+    table = $("table.stdlist-query").first();
+  }
 
   if (table.length === 0) {
-    throw new Error(`Task ${id} detail table was not found.`);
+    throw new ResourceParseError("task", `detail table was not found for ${id}`);
   }
 
   const { fields, title } = parseDetailRows($, table);
-  const base = createTaskBase({ $, fields, listItem, title });
+  const base = createTaskBase({ $, fields, task, title, url });
 
   if (base.kind === "report") {
     return {
@@ -337,10 +408,4 @@ export async function getTaskInfo(id: string): Promise<TaskInfoJson> {
   };
 
   return survey;
-}
-
-export async function openTask(id: string): Promise<void> {
-  const item = await findTaskListItem(id);
-
-  await openUrl(item.url);
 }
